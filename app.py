@@ -18,10 +18,10 @@ logging.basicConfig(level=logging.INFO)
 
 # Конфигурация
 class Config:
-    CACHE_FILE = os.getenv('CACHE_FILE', r'C:\Users\vikto\.vscode\project_1\main_project\InfoCompas\cache\embeddings_cache.npy')
-    EXCEL_PATH = os.getenv('EXCEL_PATH', r'C:\Users\vikto\.vscode\project_1\main_project\InfoCompas\data\ответы.xlsx')
-    LINKS_PATH = os.getenv('LINKS_PATH', r'C:\Users\vikto\.vscode\project_1\main_project\InfoCompas\data\links.xlsx')
-    PDF_PATH = os.getenv('PDF_PATH', r'C:\Users\vikto\.vscode\project_1\main_project\InfoCompas\data\instruction.pdf')
+    CACHE_FILE = os.getenv('CACHE_FILE', 'cache\embeddings_cache.npy')
+    EXCEL_PATH = os.getenv('EXCEL_PATH', 'data\ответы.xlsx')  # Use environment variable
+    LINKS_PATH = os.getenv('LINKS_PATH', 'data\links.xlsx')  # Use environment variable
+    PDF_PATH = os.getenv('PDF_PATH', 'data\instruction.pdf')  # Use environment variable
 
 # Загрузка токенизатора и модели из Hugging Face
 tokenizer = AutoTokenizer.from_pretrained("cointegrated/rubert-tiny2")
@@ -88,23 +88,6 @@ def find_relevant_links(user_question, threshold=0.3):
     relevant_indices = [i for i, sim in enumerate(similarity) if sim > threshold]
     return df_links.iloc[relevant_indices]
 
-# Извлечение текста из PDF
-def extract_text_from_pdf(pdf_path):
-    pdf_document = fitz.open(pdf_path)
-    text = ""
-    for page_num in range(len(pdf_document)):
-        page = pdf_document.load_page(page_num)
-        text += page.get_text()
-    return text
-
-# Поиск ответа в тексте PDF
-def find_answer_in_pdf(query_embedding, pdf_text):
-    paragraphs = pdf_text.split('\n')
-    paragraph_embeddings = [get_embedding(paragraph) for paragraph in paragraphs]
-    similarities = cosine_similarity([query_embedding], paragraph_embeddings)
-    most_similar_index = np.argmax(similarities)
-    return paragraphs[most_similar_index]
-
 # Словарь с разговорными фразами и ответами
 conversational_responses = {
     "привет": "Привет! Чем могу помочь?",
@@ -145,11 +128,6 @@ def chat():
         links = find_relevant_links(user_question_lower)
         formatted_links = [{'question': row['Текст_вопроса'], 'url': row['Ссылка']} for _, row in links.iterrows() if row['Ссылка']]
         
-        # Если ответ не найден в Excel, ищем в PDF
-        if answer.lower() == "no answer found":
-            pdf_text = extract_text_from_pdf(Config.PDF_PATH)
-            answer = find_answer_in_pdf(query_embedding, pdf_text)
-        
         return jsonify({'answer': answer, 'feedback': True, 'links': formatted_links})
     except Exception as e:
         logging.error(f"Error in /chat: {e}")
@@ -161,4 +139,5 @@ def load_suggestions():
     return jsonify({'suggestions': suggestions})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080)
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
