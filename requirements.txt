@@ -1,8 +1,8 @@
 Flask
+pandas
+transformers
+torch
+numpy
 scikit-learn
 PyMuPDF
-pandas
-nltk
-APScheduler
-
 
