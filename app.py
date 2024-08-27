@@ -18,10 +18,11 @@ logging.basicConfig(level=logging.INFO)
 
 # Конфигурация
 class Config:
-    CACHE_FILE = os.getenv('CACHE_FILE', 'embeddings_cache.npy')
-    EXCEL_PATH = os.getenv('EXCEL_PATH', 'ответы.xlsx')  # Use environment variable
-    LINKS_PATH = os.getenv('LINKS_PATH', 'links.xlsx')  # Use environment variable
-    PDF_PATH = os.getenv('PDF_PATH', 'instruction.pdf')  # Use environment variable
+    #LOAD_DIRECTORY = os.getenv('LOAD_DIRECTORY', r"InfoCompas\model")
+    CACHE_FILE = os.getenv('CACHE_FILE', r'cache\embeddings_cache.npy')
+    EXCEL_PATH = os.getenv('EXCEL_PATH', r'data\ответы.xlsx')
+    LINKS_PATH = os.getenv('LINKS_PATH', r'data\links.xlsx')
+    PDF_PATH = os.getenv('PDF_PATH', r'data\instruction.pdf')
 
 # Загрузка токенизатора и модели из Hugging Face
 tokenizer = AutoTokenizer.from_pretrained("cointegrated/rubert-tiny2")
