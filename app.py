@@ -9,6 +9,7 @@ import time
 import os
 import logging
 import fitz  # PyMuPDF
+import csv
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your_default_secret_key')  # Используйте переменные окружения для секретных ключей
@@ -18,11 +19,13 @@ logging.basicConfig(level=logging.INFO)
 
 # Конфигурация
 class Config:
-    #LOAD_DIRECTORY = os.getenv('LOAD_DIRECTORY', r"InfoCompas\model")
-    CACHE_FILE = os.getenv('CACHE_FILE', r'cache\embeddings_cache.npy')
-    EXCEL_PATH = os.getenv('EXCEL_PATH', r'data\ответы.xlsx')
-    LINKS_PATH = os.getenv('LINKS_PATH', r'data\links.xlsx')
-    PDF_PATH = os.getenv('PDF_PATH', r'data\instruction.pdf')
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    DATA_DIR = os.path.join(BASE_DIR, 'data')
+    CACHE_DIR = os.path.join(BASE_DIR, 'cache')
+    CACHE_FILE = os.getenv('CACHE_FILE', os.path.join(CACHE_DIR, 'embeddings_cache.npy'))
+    EXCEL_PATH = os.getenv('EXCEL_PATH', os.path.join(DATA_DIR, 'ответы.xlsx'))
+    LINKS_PATH = os.getenv('LINKS_PATH', os.path.join(DATA_DIR, 'links.xlsx'))
+    PDF_PATH = os.getenv('PDF_PATH', os.path.join(DATA_DIR, 'instruction.pdf'))
 
 # Загрузка токенизатора и модели из Hugging Face
 tokenizer = AutoTokenizer.from_pretrained("cointegrated/rubert-tiny2")
@@ -48,6 +51,8 @@ embeddings_cache = load_embeddings_cache()
 
 # Загрузка данных из Excel
 def load_excel_data(path):
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"File not found: {path}")
     df = pd.read_excel(path)
     return df
 
@@ -138,6 +143,47 @@ def chat():
 def load_suggestions():
     suggestions = [q.strip() + '?' for question in df_answers['Текст_вопроса'].tolist() for q in question.split('?') if q.strip()]
     return jsonify({'suggestions': suggestions})
+
+@app.route('/feedback', methods=['POST'])
+def feedback():
+    try:
+        data = request.json
+        question = data.get('question')
+        feedback = data.get('feedback')  # 'like' or 'dislike'
+
+        if not question or feedback not in ['like', 'dislike']:
+            return jsonify({'error': 'Invalid feedback data'}), 400
+
+        # Save feedback to the database or file
+        save_feedback(question, feedback)
+
+        return jsonify({'message': 'Feedback received'}), 200
+    except Exception as e:
+        logging.error(f"Error in /feedback: {e}")
+        return jsonify({'error': 'Internal Server Error'}), 500
+
+def save_feedback(question, feedback):
+    FEEDBACK_FILE = os.path.join(Config.DATA_DIR, 'feedback.csv')
+    with open(FEEDBACK_FILE, mode='a', newline='', encoding='utf-8') as file:
+        writer = csv.writer(file)
+        writer.writerow([question, feedback])
+
+def retrain_model():
+    feedback_data = load_feedback()
+    # Implement your model retraining logic here
+    # For example, you can use feedback_data to adjust embeddings or retrain the model
+    # Save the new model if necessary
+    pass
+
+def load_feedback():
+    FEEDBACK_FILE = os.path.join(Config.DATA_DIR, 'feedback.csv')
+    feedback_data = []
+    if os.path.exists(FEEDBACK_FILE):
+        with open(FEEDBACK_FILE, mode='r', encoding='utf-8') as file:
+            reader = csv.reader(file)
+            for row in reader:
+                feedback_data.append(row)
+    return feedback_data
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
