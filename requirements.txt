@@ -1,0 +1,8 @@
+Flask
+scikit-learn
+PyMuPDF
+pandas
+nltk
+APScheduler
+
+

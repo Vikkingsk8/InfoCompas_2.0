@@ -1,0 +1,385 @@
+/* styles.css */
+/* Авторы: Ермилов В.В., Файбисович В.А. */
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: url("/static/background.jpg") center/cover no-repeat;
+    overflow: hidden;
+}
+
+.header {
+    background-color: #007BFF;
+    height: 50px;
+    display: flex;
+    align-items: center;
+}
+
+.footer {
+    background-color: #007BFF;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: white;
+    font-size: 10px;
+    padding: 10px 0;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    z-index: 1001;
+}
+
+.footer .contact-info,
+.footer .copyright,
+.footer .email {
+    font-size: 12px;
+    margin-bottom: 5px;
+    align-self: center;
+}
+
+.logo {
+    height: 30px;
+    margin-left: 10px;
+}
+
+.chat-container {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    padding: 20px;
+    position: relative;
+}
+
+.instruction-tile {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    background-color: #ffffff;
+    padding: 10px;
+    border-radius: 10px;
+}
+
+.instruction-tile a {
+    text-decoration: none;
+    color: #007BFF;
+    font-weight: bold;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 12px;
+}
+
+.instruction-image {
+    width: 200px;
+    margin-bottom: 10px;
+}
+
+.input-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px;
+    width: 100%;
+    max-width: 800px;
+    margin-top: 20px;
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: transparent;
+    border-radius: 5px;
+}
+
+.toggle-button {
+    margin: 0 10px;
+    padding: 10px;
+    background: linear-gradient(270deg, #a12ccf, #007BFF);
+    background-size: 200% 200%;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    animation: rotateGradient 5s ease infinite; /* Добавляем анимацию */
+}
+
+.toggle-button:hover {
+    background: linear-gradient(270deg, #9f08a2, #0b1de6);
+    background-size: 200% 200%;
+}
+
+@keyframes rotateGradient {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+.input-field {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    margin-right: 10px;
+    background-color: rgba(255, 255, 255, 0.8);
+}
+
+.send-button {
+    background-color: #007BFF;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 20px;
+    cursor: pointer;
+}
+
+.send-button:hover {
+    background-color: #0056b3;
+}
+
+.chat-box {
+    width: 100%;
+    max-width: 800px;
+    height: 100%;
+    max-height: calc(100vh - 220px);
+    background-color: transparent;
+    border-radius: 10px;
+    padding: 20px;
+    overflow-y: auto;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column-reverse;
+    scrollbar-width: thin;
+    scrollbar-color: #888 transparent;
+    margin-bottom: 20px;
+    position: absolute;
+    top: 0;
+}
+
+.chat-box::-webkit-scrollbar {
+    width: 12px;
+}
+
+.chat-box::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.chat-box::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+.chat-box::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+.message {
+    margin: 10px 0;
+    line-height: 1.4;
+    display: flex;
+    align-items: center;
+    max-width: 80%;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.5s, transform 0.5s;
+}
+
+.user-message {
+    background-color: #007BFF;
+    color: white;
+    justify-content: flex-end;
+    align-self: flex-end;
+    border-radius: 10px 10px 0 10px;
+    padding: 10px;
+}
+
+.bot-message {
+    background-color: rgba(255, 255, 255, 0.8);
+    color: #333;
+    justify-content: flex-start;
+    align-self: flex-start;
+    border-radius: 10px 10px 10px 0;
+    padding: 10px;
+    position: relative;
+    text-align: justify;
+}
+
+.loading-message {
+    text-align: center;
+    color: #888;
+}
+
+.message img {
+    width: 30px;
+    height: 30px;
+    margin-right: 10px;
+}
+
+.user-message img {
+    margin-left: 10px;
+    order: 1;
+}
+
+.fade-in {
+    opacity: 1;
+}
+
+.slide-in {
+    transform: translateY(0);
+}
+
+.bot-message p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+    margin-right: 10px;
+}
+
+.bot-message a {
+    color: #007BFF;
+    text-decoration: none;
+    font-weight: bold;
+    text-align: center;
+}
+
+.bot-message a:hover {
+    text-decoration: underline;
+}
+
+.link-button {
+    display: inline-block;
+    margin: 5px;
+    padding: 5px 10px;
+    background: linear-gradient(to right, #8d60cd, #7e0e8d);
+    color: rgb(255, 255, 255);
+    text-decoration: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.link-button:hover {
+    background: linear-gradient(to right, #763f96, #50055a);
+}
+
+.link-button.fade-in,
+.show-more-container.fade-in {
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeIn 0.5s ease-in forwards;
+}
+
+@keyframes fadeIn {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.links-container {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    margin-top: 5px;
+}
+
+.feedback-container {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: auto;
+    margin-left: 20px;
+    margin-right: -60px;
+    flex-direction: column;
+    bottom: 0;
+    right: 0;
+    gap: 10px;
+}
+
+.feedback-button {
+    background-color: #b9141400;
+    border: none;
+    cursor: pointer;
+}
+
+.feedback-button img {
+    width: 26px;
+    height: 26px;
+}
+
+.feedback-button.disabled {
+    pointer-events: none;
+    opacity: 0.9;
+}
+
+.show-more-container {
+    display: inline-block;
+    margin: 5px;
+    padding: 5px 10px;
+    background: linear-gradient(to right, #4130f9, #c703f9);
+    color: rgb(255, 255, 255);
+    text-decoration: none;
+    border-radius: 5px;
+    cursor: pointer;
+    text-align: center;
+    transition: background-color 0.3s ease;
+}
+
+.show-more-container:hover {
+    background: linear-gradient(to right, #450368, #2d1bec);
+}
+
+.suggestion-button {
+    display: inline-block;
+    margin: 5px;
+    padding: 5px 10px;
+    background-color: #007BFF;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 5px;
+    cursor: pointer;
+    border: none;
+    opacity: 1;
+    transform: translateY(10px);
+    transition: transform 0.3s;
+}
+
+.suggestion-button:hover {
+    background-color: #0b77eb;
+}
+
+.suggestion-box {
+    display: flex;
+    justify-content: center;
+    margin-top: 10px;
+    position: fixed;
+    bottom: 55px;
+    left: 0;
+    transform: translateX(-50%);
+    z-index: 1002;
+    background-color: transparent;
+    border: none;
+    padding: 5px;
+    max-height: 200px;
+    overflow-y: auto;
+    opacity: 1;
+    transform: translateY(10px);
+    transition: transform 0.3s;
+}
+
+.suggestion-box.show {
+    transform: translateY(0);
+}
