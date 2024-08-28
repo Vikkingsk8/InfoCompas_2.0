@@ -471,7 +471,7 @@ body {
     .suggestion-button {
         margin: 3px;
         padding: 3px 8px;
-        font-size: 14px;
+        font-size: 16px !important;
         
     }
 
@@ -485,4 +485,23 @@ body {
         width: 20px;
         height: 20px;
     }
+
+    .chat-box::-webkit-scrollbar {
+        width: 8px; /* Уменьшаем ширину вертикального скроллбара */
+    }
+
+    .chat-box::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 5px;
+    }
+
+    .chat-box::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
 }
+    /* Дополнительный медиа-запрос для горизонтального режима */
+    @media (max-height: 600px) and (orientation: landscape) {
+        .toggle-button {
+            display: none !important;
+        }
+    }
