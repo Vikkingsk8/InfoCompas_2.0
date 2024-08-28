@@ -264,7 +264,7 @@ body {
     display: inline-block;
     margin: 5px;
     padding: 5px 10px;
-    background: linear-gradient(to right, #8d60cd, #7e0e8d);
+    background-color: #a12ccf;
     color: rgb(255, 255, 255);
     text-decoration: none;
     border-radius: 5px;
@@ -272,7 +272,7 @@ body {
 }
 
 .link-button:hover {
-    background: linear-gradient(to right, #763f96, #50055a);
+    background-color: #9e2fa5;
 }
 
 .link-button.fade-in,
@@ -418,8 +418,9 @@ body {
 
     .input-container {
         padding: 5px;
-        bottom: 80px;
+        bottom: 60px;
         width: calc(100% - 20px); /* Убираем горизонтальный скролл */
+        
     }
 
     .toggle-button {
@@ -432,10 +433,12 @@ body {
         padding: 5px;
         margin-right: 5px;
         width: 100%; /* Убедитесь, что поле ввода занимает всю доступную ширину */
+        height: 30px !important;
     }
 
     .send-button {
-        padding: 5px 10px;
+        padding: 5px;
+        height: 40px !important;
     }
 
     .chat-box {
@@ -468,7 +471,7 @@ body {
     .suggestion-button {
         margin: 3px;
         padding: 3px 8px;
-        font-size: 12px;
+        font-size: 14px;
         
     }
 
