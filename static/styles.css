@@ -383,3 +383,103 @@ body {
 .suggestion-box.show {
     transform: translateY(0);
 }
+
+/* Медиа-запросы для адаптивности под смартфоны */
+@media (max-width: 600px) {
+    .header {
+        height: 40px;
+    }
+
+    .footer {
+        font-size: 10px;
+        padding: 5px 0;
+    }
+
+    .footer .contact-info,
+    .footer .copyright,
+    .footer .email {
+        font-size: 10px;
+        margin-bottom: 3px;
+    }
+
+    .logo {
+        height: 25px;
+        margin-left: 5px;
+    }
+
+    .chat-container {
+        padding: 10px;
+        overflow-x: hidden !important; /* Скрываем горизонтальный скролл */
+    }
+
+    .instruction-tile {
+        display: none !important; /* Скрываем кнопку "Руководство пользователя" на мобильных устройствах */
+    }
+
+    .input-container {
+        padding: 5px;
+        bottom: 80px;
+        width: calc(100% - 20px); /* Убираем горизонтальный скролл */
+    }
+
+    .toggle-button {
+        display: none !important;
+        margin: 0 5px;
+        padding: 5px;
+    }
+
+    .input-field {
+        padding: 5px;
+        margin-right: 5px;
+        width: 100%; /* Убедитесь, что поле ввода занимает всю доступную ширину */
+    }
+
+    .send-button {
+        padding: 5px 10px;
+    }
+
+    .chat-box {
+        max-width: 100% !important; /* Ограничиваем ширину чат-бокса */
+        width: 100% !important;
+        max-height: calc(100vh - 180px);
+        padding: 15px !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important; /* Скрываем горизонтальный скролл */
+    }
+
+    .message {
+        max-width: 90%;
+        word-wrap: break-word; /* Перенос слов для предотвращения выхода за пределы контейнера */
+    }
+
+    .user-message,
+    .bot-message {
+        padding: 5px;
+        max-width: 100%; /* Убедитесь, что сообщения не выходят за пределы контейнера */
+        word-wrap: break-word; /* Перенос слов для предотвращения выхода за пределы контейнера */
+    }
+
+    .bot-message p {
+        font-size: 12px;
+    }
+
+    .link-button,
+    .show-more-container,
+    .suggestion-button {
+        margin: 3px;
+        padding: 3px 8px;
+        font-size: 12px;
+        
+    }
+
+    .suggestion-box {
+        max-height: 150px; /* Ограничиваем высоту контейнера с предложениями */
+        overflow-y: hidden !important; /* Добавляем вертикальный скролл, если контент не помещается */
+        overflow-x: hidden !important; /* Убираем горизонтальный скролл */
+    }
+
+    .feedback-button img {
+        width: 20px;
+        height: 20px;
+    }
+}
