@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ИнфоКомпас</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
 </head>
 <body>
     <div class="header">
@@ -149,6 +150,14 @@
             linkButton.addEventListener('click', (event) => {
                 event.preventDefault();
                 sendLinkQuestion(link.question, link.url);
+                // Открытие ссылки в новой вкладке через форму
+                const form = document.createElement('form');
+                form.method = 'GET';
+                form.action = link.url;
+                form.target = '_blank';
+                document.body.appendChild(form);
+                form.submit();
+                document.body.removeChild(form);
             });
             return linkButton;
         }
