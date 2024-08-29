@@ -26,6 +26,7 @@ class Config:
     EXCEL_PATH = os.getenv('EXCEL_PATH', os.path.join(DATA_DIR, 'ответы.xlsx'))
     LINKS_PATH = os.getenv('LINKS_PATH', os.path.join(DATA_DIR, 'links.xlsx'))
     PDF_PATH = os.getenv('PDF_PATH', os.path.join(DATA_DIR, 'instruction.pdf'))
+    FEEDBACK_FILE = os.path.join(DATA_DIR, 'feedback.csv')
 
 # Загрузка токенизатора и модели из Hugging Face
 tokenizer = AutoTokenizer.from_pretrained("cointegrated/rubert-tiny2")
@@ -141,7 +142,8 @@ def chat():
 
 @app.route('/load_suggestions', methods=['GET'])
 def load_suggestions():
-    suggestions = [q.strip() + '?' for question in df_answers['Текст_вопроса'].tolist() for q in question.split('?') if q.strip()]
+    suggestions = [q.strip().rstrip('?') for question in df_answers['Текст_вопроса'].tolist() for q in question.split('?') if q.strip()]
+    suggestions = [s[0].upper() + s[1:] if s else s for s in suggestions]
     return jsonify({'suggestions': suggestions})
 
 @app.route('/feedback', methods=['POST'])
@@ -149,38 +151,50 @@ def feedback():
     try:
         data = request.json
         question = data.get('question')
+        answer = data.get('answer')
         feedback = data.get('feedback')  # 'like' or 'dislike'
 
-        if not question or feedback not in ['like', 'dislike']:
+        if not question or not answer or feedback not in ['like', 'dislike']:
             return jsonify({'error': 'Invalid feedback data'}), 400
 
         # Save feedback to the database or file
-        save_feedback(question, feedback)
+        save_feedback(question, answer, feedback)
 
         return jsonify({'message': 'Feedback received'}), 200
     except Exception as e:
         logging.error(f"Error in /feedback: {e}")
         return jsonify({'error': 'Internal Server Error'}), 500
 
-def save_feedback(question, feedback):
-    FEEDBACK_FILE = os.path.join(Config.DATA_DIR, 'feedback.csv')
-    with open(FEEDBACK_FILE, mode='a', newline='', encoding='utf-8') as file:
-        writer = csv.writer(file)
-        writer.writerow([question, feedback])
+def save_feedback(question, answer, feedback):
+    if not os.path.exists(Config.FEEDBACK_FILE):
+        with open(Config.FEEDBACK_FILE, mode='w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            writer.writerow(['question', 'answer', 'likes', 'dislikes'])
 
-def retrain_model():
     feedback_data = load_feedback()
-    # Implement your model retraining logic here
-    # For example, you can use feedback_data to adjust embeddings or retrain the model
-    # Save the new model if necessary
-    pass
+    found = False
+    for row in feedback_data:
+        if row[0] == question and row[1] == answer:
+            if feedback == 'like':
+                row[2] = int(row[2]) + 1
+            elif feedback == 'dislike':
+                row[3] = int(row[3]) + 1
+            found = True
+            break
+
+    if not found:
+        feedback_data.append([question, answer, 1 if feedback == 'like' else 0, 1 if feedback == 'dislike' else 0])
+
+    with open(Config.FEEDBACK_FILE, mode='w', newline='', encoding='utf-8') as file:
+        writer = csv.writer(file)
+        writer.writerows(feedback_data)
 
 def load_feedback():
-    FEEDBACK_FILE = os.path.join(Config.DATA_DIR, 'feedback.csv')
     feedback_data = []
-    if os.path.exists(FEEDBACK_FILE):
-        with open(FEEDBACK_FILE, mode='r', encoding='utf-8') as file:
+    if os.path.exists(Config.FEEDBACK_FILE):
+        with open(Config.FEEDBACK_FILE, mode='r', encoding='utf-8') as file:
             reader = csv.reader(file)
+            next(reader)  # Skip header
             for row in reader:
                 feedback_data.append(row)
     return feedback_data
