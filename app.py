@@ -9,15 +9,13 @@ import time
 import os
 import logging
 import fitz  # PyMuPDF
-import csv
+from fuzzywuzzy import process
 
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', 'your_default_secret_key')  # Используйте переменные окружения для секретных ключей
+app.secret_key = os.getenv('SECRET_KEY', 'your_default_secret_key')
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 
-# Конфигурация
 class Config:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_DIR = os.path.join(BASE_DIR, 'data')
@@ -26,34 +24,31 @@ class Config:
     EXCEL_PATH = os.getenv('EXCEL_PATH', os.path.join(DATA_DIR, 'ответы.xlsx'))
     LINKS_PATH = os.getenv('LINKS_PATH', os.path.join(DATA_DIR, 'links.xlsx'))
     PDF_PATH = os.getenv('PDF_PATH', os.path.join(DATA_DIR, 'instruction.pdf'))
-    FEEDBACK_FILE = os.path.join(DATA_DIR, 'feedback.csv')
+    FEEDBACK_FILE = os.path.join(DATA_DIR, 'feedback.xlsx')
+    KEYWORDS_FILE = os.path.join(DATA_DIR, 'key_words.xlsx')
 
-# Загрузка токенизатора и модели из Hugging Face
 tokenizer = AutoTokenizer.from_pretrained("cointegrated/rubert-tiny2")
 model = AutoModel.from_pretrained("cointegrated/rubert-tiny2")
 
-# Функция для получения эмбеддинга
 def get_embedding(text):
     inputs = tokenizer(text, return_tensors='pt', truncation=True, padding=True)
     with torch.no_grad():
         outputs = model(**inputs)
     return outputs.last_hidden_state.mean(dim=1).squeeze().numpy()
 
-# Проверка наличия кэша и загрузка его
 def load_embeddings_cache():
     if os.path.exists(Config.CACHE_FILE):
         try:
             return np.load(Config.CACHE_FILE, allow_pickle=True).item()
         except Exception as e:
-            logging.error(f"Error loading embeddings cache: {e}")
+            logging.error(f"Ошибка загрузки кэша эмбеддингов: {e}")
     return {}
 
 embeddings_cache = load_embeddings_cache()
 
-# Загрузка данных из Excel
 def load_excel_data(path):
     if not os.path.exists(path):
-        raise FileNotFoundError(f"File not found: {path}")
+        raise FileNotFoundError(f"Файл не найден: {path}")
     df = pd.read_excel(path)
     return df
 
@@ -68,24 +63,47 @@ df_answers = preprocess_excel_data(df_answers, 'Текст вопроса')
 df_links = load_excel_data(Config.LINKS_PATH)
 df_links = preprocess_excel_data(df_links, 'Вопрос')
 
-# Получение эмбеддингов для вопросов
+# Загрузка ключевых слов
+df_keywords = pd.read_excel(Config.KEYWORDS_FILE)
+keywords = df_keywords['Ключевые слова'].tolist()
+
 start_time = time.time()
 df_answers['embedding'] = df_answers['Текст_вопроса'].apply(lambda x: embeddings_cache.get(x) if x in embeddings_cache else get_embedding(x))
 end_time = time.time()
 logging.info(f"Время получения эмбеддингов: {end_time - start_time} секунд")
 
-# Сохранение эмбеддингов в кэш
 for idx, row in df_answers.iterrows():
     embeddings_cache[row['Текст_вопроса']] = row['embedding']
 np.save(Config.CACHE_FILE, embeddings_cache)
 
-# Функция для поиска наиболее похожего вопроса
-def find_most_similar_question(query_embedding, df):
-    similarities = cosine_similarity([query_embedding], df['embedding'].tolist())
-    most_similar_index = np.argmax(similarities)
-    return df.iloc[most_similar_index]['Текст ответа']
+def check_keywords(query, keywords, threshold=80):
+    query_words = query.lower().split()
+    for word in query_words:
+        matches = process.extractBests(word, keywords, score_cutoff=threshold)
+        if matches:
+            return True
+    return False
 
-# Функция для поиска похожих вопросов в файле links
+def find_most_similar_question(query_embedding, query, df, embedding_threshold=0.7, levenshtein_threshold=80):
+    if not check_keywords(query, keywords):
+        return None
+    
+    similarities = cosine_similarity([query_embedding], df['embedding'].tolist())
+    max_similarity = np.max(similarities)
+    
+    if max_similarity >= embedding_threshold:
+        most_similar_index = np.argmax(similarities)
+        return df.iloc[most_similar_index]['Текст ответа']
+    else:
+        # Если не найдено достаточно похожих вопросов по эмбеддингам, используем расстояние Левенштейна
+        questions = df['Текст_вопроса'].tolist()
+        closest_match, score = process.extractOne(query, questions)
+        if score >= levenshtein_threshold:
+            closest_match_index = questions.index(closest_match)
+            return df.iloc[closest_match_index]['Текст ответа']
+        else:
+            return None
+
 def find_relevant_links(user_question, threshold=0.3):
     links_questions = df_links['Текст_вопроса'].tolist()
     links_vectorizer = TfidfVectorizer()
@@ -95,7 +113,6 @@ def find_relevant_links(user_question, threshold=0.3):
     relevant_indices = [i for i, sim in enumerate(similarity) if sim > threshold]
     return df_links.iloc[relevant_indices]
 
-# Словарь с разговорными фразами и ответами
 conversational_responses = {
     "привет": "Привет! Чем могу помочь?",
     "как дела": "У меня все отлично, спасибо! А у вас?",
@@ -122,23 +139,23 @@ def chat():
         
         user_question_lower = user_question.lower()
         
-        # Проверка на разговорные фразы
         if user_question_lower in conversational_responses:
             return jsonify({'answer': conversational_responses[user_question_lower], 'feedback': False})
         
         query_embedding = get_embedding(user_question_lower)
         
-        # Поиск ответа в Excel
-        answer = find_most_similar_question(query_embedding, df_answers)
+        answer = find_most_similar_question(query_embedding, user_question_lower, df_answers)
         
-        # Поиск похожих вопросов в файле links
+        if answer is None:
+            return jsonify({'answer': "Извините, я не могу найти подходящий ответ на ваш вопрос. Пожалуйста, перефразируйте его или задайте другой вопрос.", 'feedback': False})
+        
         links = find_relevant_links(user_question_lower)
         formatted_links = [{'question': row['Текст_вопроса'], 'url': row['Ссылка']} for _, row in links.iterrows() if row['Ссылка']]
         
         return jsonify({'answer': answer, 'feedback': True, 'links': formatted_links})
     except Exception as e:
-        logging.error(f"Error in /chat: {e}")
-        return jsonify({'error': 'Internal Server Error'}), 500
+        logging.error(f"Ошибка в /chat: {e}")
+        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
 
 @app.route('/load_suggestions', methods=['GET'])
 def load_suggestions():
@@ -155,49 +172,66 @@ def feedback():
         feedback = data.get('feedback')  # 'like' or 'dislike'
 
         if not question or not answer or feedback not in ['like', 'dislike']:
-            return jsonify({'error': 'Invalid feedback data'}), 400
+            return jsonify({'error': 'Неверные данные обратной связи'}), 400
 
-        # Save feedback to the database or file
         save_feedback(question, answer, feedback)
 
-        return jsonify({'message': 'Feedback received'}), 200
+        return jsonify({'message': 'Обратная связь получена'}), 200
     except Exception as e:
-        logging.error(f"Error in /feedback: {e}")
-        return jsonify({'error': 'Internal Server Error'}), 500
+        logging.error(f"Ошибка в /feedback: {e}")
+        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
 
 def save_feedback(question, answer, feedback):
     if not os.path.exists(Config.FEEDBACK_FILE):
-        with open(Config.FEEDBACK_FILE, mode='w', newline='', encoding='utf-8') as file:
-            writer = csv.writer(file)
-            writer.writerow(['question', 'answer', 'likes', 'dislikes'])
+        df = pd.DataFrame(columns=['question', 'answer', 'likes', 'dislikes'])
+        df.to_excel(Config.FEEDBACK_FILE, index=False)
 
-    feedback_data = load_feedback()
-    found = False
-    for row in feedback_data:
-        if row[0] == question and row[1] == answer:
-            if feedback == 'like':
-                row[2] = int(row[2]) + 1
-            elif feedback == 'dislike':
-                row[3] = int(row[3]) + 1
-            found = True
-            break
+    df = pd.read_excel(Config.FEEDBACK_FILE)
+    row = df[(df['question'] == question) & (df['answer'] == answer)]
 
-    if not found:
-        feedback_data.append([question, answer, 1 if feedback == 'like' else 0, 1 if feedback == 'dislike' else 0])
+    if not row.empty:
+        row_index = row.index[0]
+        if feedback == 'like':
+            df.at[row_index, 'likes'] += 1
+        elif feedback == 'dislike':
+            df.at[row_index, 'dislikes'] += 1
+    else:
+        new_row = pd.DataFrame({'question': [question], 'answer': [answer], 'likes': [1 if feedback == 'like' else 0], 'dislikes': [1 if feedback == 'dislike' else 0]})
+        df = pd.concat([df, new_row], ignore_index=True)
 
-    with open(Config.FEEDBACK_FILE, mode='w', newline='', encoding='utf-8') as file:
-        writer = csv.writer(file)
-        writer.writerows(feedback_data)
+    df.to_excel(Config.FEEDBACK_FILE, index=False)
 
-def load_feedback():
-    feedback_data = []
-    if os.path.exists(Config.FEEDBACK_FILE):
-        with open(Config.FEEDBACK_FILE, mode='r', encoding='utf-8') as file:
-            reader = csv.reader(file)
-            next(reader)  # Skip header
-            for row in reader:
-                feedback_data.append(row)
-    return feedback_data
+@app.route('/like', methods=['POST'])
+def like():
+    try:
+        data = request.json
+        question = data.get('question')
+        answer = data.get('answer')
+
+        if not question or not answer:
+            return jsonify({'error': 'Неверные данные обратной связи'}), 400
+
+        save_feedback(question, answer, 'like')
+        return jsonify({'message': 'Лайк получен'}), 200
+    except Exception as e:
+        logging.error(f"Ошибка в /like: {e}")
+        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
+
+@app.route('/dislike', methods=['POST'])
+def dislike():
+    try:
+        data = request.json
+        question = data.get('question')
+        answer = data.get('answer')
+
+        if not question or not answer:
+            return jsonify({'error': 'Неверные данные обратной связи'}), 400
+
+        save_feedback(question, answer, 'dislike')
+        return jsonify({'message': 'Дизлайк получен'}), 200
+    except Exception as e:
+        logging.error(f"Ошибка в /dislike: {e}")
+        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
