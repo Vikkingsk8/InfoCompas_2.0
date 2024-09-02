@@ -73,6 +73,9 @@ end_time = time.time()
 logging.info(f"Время получения эмбеддингов: {end_time - start_time} секунд")
 
 # Сохранение кэша эмбеддингов
+if not os.path.exists(Config.CACHE_DIR):
+    os.makedirs(Config.CACHE_DIR)
+
 for idx, row in df_answers.iterrows():
     embeddings_cache[row['Текст_вопроса']] = row['embedding']
 np.save(Config.CACHE_FILE, embeddings_cache)
