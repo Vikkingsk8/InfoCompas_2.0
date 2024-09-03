@@ -4,17 +4,26 @@ from transformers import AutoTokenizer, AutoModel
 import torch
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
+from fuzzywuzzy import fuzz
+from rank_bm25 import BM25Okapi
 from sklearn.feature_extraction.text import TfidfVectorizer
-import time
 import os
 import logging
-import fitz  # PyMuPDF
-from fuzzywuzzy import process
+import time
+import re
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from collections import defaultdict
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your_default_secret_key')
 
 logging.basicConfig(level=logging.INFO)
+
+# Убедитесь, что вы скачали необходимые данные NLTK
+import nltk
+nltk.download('stopwords')
+nltk.download('punkt')
 
 class Config:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -25,13 +34,12 @@ class Config:
     LINKS_PATH = os.getenv('LINKS_PATH', os.path.join(DATA_DIR, 'links.xlsx'))
     PDF_PATH = os.getenv('PDF_PATH', os.path.join(DATA_DIR, 'instruction.pdf'))
     FEEDBACK_FILE = os.path.join(DATA_DIR, 'feedback.xlsx')
-    KEYWORDS_FILE = os.path.join(DATA_DIR, 'key_words.xlsx')
 
 tokenizer = AutoTokenizer.from_pretrained("cointegrated/rubert-tiny2")
 model = AutoModel.from_pretrained("cointegrated/rubert-tiny2")
 
 def get_embedding(text):
-    inputs = tokenizer(text, return_tensors='pt', truncation=True, padding=True)
+    inputs = tokenizer(text, return_tensors='pt', truncation=True, padding=True, max_length=512)
     with torch.no_grad():
         outputs = model(**inputs)
     return outputs.last_hidden_state.mean(dim=1).squeeze().numpy()
@@ -63,16 +71,11 @@ df_answers = preprocess_excel_data(df_answers, 'Текст вопроса')
 df_links = load_excel_data(Config.LINKS_PATH)
 df_links = preprocess_excel_data(df_links, 'Вопрос')
 
-# Загрузка ключевых слов
-df_keywords = pd.read_excel(Config.KEYWORDS_FILE)
-keywords = df_keywords['Ключевые слова'].tolist()
-
 start_time = time.time()
 df_answers['embedding'] = df_answers['Текст_вопроса'].apply(lambda x: embeddings_cache.get(x) if x in embeddings_cache else get_embedding(x))
 end_time = time.time()
 logging.info(f"Время получения эмбеддингов: {end_time - start_time} секунд")
 
-# Сохранение кэша эмбеддингов
 if not os.path.exists(Config.CACHE_DIR):
     os.makedirs(Config.CACHE_DIR)
 
@@ -80,33 +83,75 @@ for idx, row in df_answers.iterrows():
     embeddings_cache[row['Текст_вопроса']] = row['embedding']
 np.save(Config.CACHE_FILE, embeddings_cache)
 
-def check_keywords(query, keywords, threshold=80):
-    query_words = query.lower().split()
-    for word in query_words:
-        matches = process.extractBests(word, keywords, score_cutoff=threshold)
-        if matches:
-            return True
-    return False
+# Подготовка данных для BM25
+tokenized_corpus = [doc.split() for doc in df_answers['Текст_вопроса']]
+bm25 = BM25Okapi(tokenized_corpus)
 
-def find_most_similar_question(query_embedding, query, df, embedding_threshold=0.7, levenshtein_threshold=80):
-    if not check_keywords(query, keywords):
-        return None
+# Список вопросительных слов и фраз для игнорирования
+question_words = set(['что', 'такое', 'это', 'почему', 'расскажи', 'как', 'что значит', 'кто', 'где', 'когда', 'сколько', 'какой', 'какая', 'какие', 'чем', 'зачем', 'дел ам', 'дел', 'где найти', 'найти', 'как найти', 'как это сделать'])
+
+# Создаем индекс при загрузке данных
+question_index = defaultdict(set)
+
+def preprocess_text(text):
+    # Удаление знаков препинания и приведение к нижнему регистру
+    text = re.sub(r'[^\w\s]', '', text.lower())
+    # Токенизация текста
+    words = word_tokenize(text)
+    # Удаление вопросительных слов и стоп-слов
+    filtered_words = [word for word in words if word not in question_words and word not in stopwords.words('russian')]
+    return set(filtered_words)  # Возвращаем множество слов
+
+# Предобработка и индексация вопросов из базы данных
+for idx, row in df_answers.iterrows():
+    questions = row['Текст вопроса'].split('?')
+    for question in questions:
+        preprocessed_question = preprocess_text(question)
+        for word in preprocessed_question:
+            question_index[word].add(idx)
+
+def check_question_validity(user_question):
+    preprocessed_user_question = preprocess_text(user_question)
     
-    similarities = cosine_similarity([query_embedding], df['embedding'].tolist())
-    max_similarity = np.max(similarities)
+    # Проверяем, остались ли какие-либо слова после предобработки
+    if len(preprocessed_user_question) == 0:
+        return False, None
     
-    if max_similarity >= embedding_threshold:
-        most_similar_index = np.argmax(similarities)
-        return df.iloc[most_similar_index]['Текст ответа']
+    # Проверяем, есть ли хотя бы одно слово из вопроса пользователя в нашей базе данных
+    for word in preprocessed_user_question:
+        if word in question_index:
+            return True, user_question  # Возвращаем оригинальный вопрос пользователя
+    
+    return False, None
+
+def find_best_answer(query, embedding_weight=0.7, levenshtein_weight=0.15, bm25_weight=0.15):
+    query_embedding = get_embedding(query)
+    
+    # Расчет сходства эмбеддингов
+    embedding_similarities = cosine_similarity([query_embedding], df_answers['embedding'].tolist())[0]
+    
+    # Расчет расстояния Левенштейна
+    levenshtein_similarities = np.array([fuzz.ratio(query, q) / 100 for q in df_answers['Текст_вопроса']])
+    
+    # Расчет BM25
+    bm25_scores = np.array(bm25.get_scores(query.split()))
+    bm25_scores = (bm25_scores - bm25_scores.min()) / (bm25_scores.max() - bm25_scores.min() + 1e-8)  # Нормализация
+    
+    # Комбинирование оценок с весами
+    combined_scores = (
+        embedding_weight * embedding_similarities +
+        levenshtein_weight * levenshtein_similarities +
+        bm25_weight * bm25_scores
+    )
+    
+    best_match_index = np.argmax(combined_scores)
+    best_match_score = combined_scores[best_match_index]
+    
+    # Возвращаем лучший ответ, если оценка выше порога
+    if best_match_score > 0.5:  # Порог можно настроить
+        return df_answers.iloc[best_match_index]['Текст ответа'], df_answers.iloc[best_match_index]['Текст_вопроса']
     else:
-        # Если не найдено достаточно похожих вопросов по эмбеддингам, используем расстояние Левенштейна
-        questions = df['Текст_вопроса'].tolist()
-        closest_match, score = process.extractOne(query, questions)
-        if score >= levenshtein_threshold:
-            closest_match_index = questions.index(closest_match)
-            return df.iloc[closest_match_index]['Текст ответа']
-        else:
-            return None
+        return None, None
 
 def find_relevant_links(user_question, threshold=0.3):
     links_questions = df_links['Текст_вопроса'].tolist()
@@ -124,9 +169,16 @@ conversational_responses = {
     "как тебя зовут": "Меня зовут ИнфоКомпас. Я здесь, чтобы помочь вам найти информацию."
 }
 
+
 @app.route('/download_pdf')
 def download_pdf():
     return send_file(Config.PDF_PATH, as_attachment=False)
+
+@app.route('/load_suggestions', methods=['GET'])
+def load_suggestions():
+    suggestions = [q.strip().rstrip('?') for question in df_answers['Текст_вопроса'].tolist() for q in question.split('?') if q.strip()]
+    suggestions = [s[0].upper() + s[1:] if s else s for s in suggestions]
+    return jsonify({'suggestions': suggestions})
 
 @app.route('/')
 def index():
@@ -146,9 +198,20 @@ def chat():
         if user_question_lower in conversational_responses:
             return jsonify({'answer': conversational_responses[user_question_lower], 'feedback': False})
         
-        query_embedding = get_embedding(user_question_lower)
+        # Проверка валидности вопроса
+        is_valid, validated_question = check_question_validity(user_question)
         
-        answer = find_most_similar_question(query_embedding, user_question_lower, df_answers)
+        logging.info(f"Вопрос пользователя: {user_question}")
+        logging.info(f"Валидность вопроса: {is_valid}")
+        
+        if not is_valid:
+            return jsonify({'answer': "Извините, я не совсем понял ваш вопрос. Пожалуйста, перефразируйте его или задайте более конкретный вопрос.", 'feedback': False})
+        
+        # Если вопрос валидный, ищем ответ на оригинальный вопрос пользователя
+        answer, matched_question = find_best_answer(validated_question)
+        
+        logging.info(f"Найденный ответ: {answer}")
+        logging.info(f"Совпавший вопрос: {matched_question}")
         
         if answer is None:
             return jsonify({'answer': "Извините, я не могу найти подходящий ответ на ваш вопрос. Пожалуйста, перефразируйте его или задайте другой вопрос.", 'feedback': False})
@@ -156,34 +219,37 @@ def chat():
         links = find_relevant_links(user_question_lower)
         formatted_links = [{'question': row['Текст_вопроса'], 'url': row['Ссылка']} for _, row in links.iterrows() if row['Ссылка']]
         
-        return jsonify({'answer': answer, 'feedback': True, 'links': formatted_links})
+        return jsonify({'answer': answer, 'feedback': True, 'links': formatted_links, 'matched_question': matched_question})
     except Exception as e:
         logging.error(f"Ошибка в /chat: {e}")
         return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
 
-@app.route('/load_suggestions', methods=['GET'])
-def load_suggestions():
-    suggestions = [q.strip().rstrip('?') for question in df_answers['Текст_вопроса'].tolist() for q in question.split('?') if q.strip()]
-    suggestions = [s[0].upper() + s[1:] if s else s for s in suggestions]
-    return jsonify({'suggestions': suggestions})
-
 @app.route('/feedback', methods=['POST'])
 def feedback():
+    data = request.json
+    question = data.get('question')
+    answer = data.get('answer')
+    feedback_type = data.get('type')
+    comment = data.get('comment', '')
+
+    if not all([question, answer, feedback_type]):
+        return jsonify({'error': 'Не все необходимые данные предоставлены'}), 400
+
     try:
-        data = request.json
-        question = data.get('question')
-        answer = data.get('answer')
-        feedback = data.get('feedback')  # 'like' or 'dislike'
-
-        if not question or not answer or feedback not in ['like', 'dislike']:
-            return jsonify({'error': 'Неверные данные обратной связи'}), 400
-
-        save_feedback(question, answer, feedback)
-
-        return jsonify({'message': 'Обратная связь получена'}), 200
+        df = pd.read_excel(Config.FEEDBACK_FILE) if os.path.exists(Config.FEEDBACK_FILE) else pd.DataFrame()
+        new_feedback = pd.DataFrame({
+            'Вопрос': [question],
+            'Ответ': [answer],
+            'Тип обратной связи': [feedback_type],
+            'Комментарий': [comment],
+            'Дата': [pd.Timestamp.now()]
+        })
+        df = pd.concat([df, new_feedback], ignore_index=True)
+        df.to_excel(Config.FEEDBACK_FILE, index=False)
+        return jsonify({'message': 'Спасибо за ваш отзыв!'}), 200
     except Exception as e:
-        logging.error(f"Ошибка в /feedback: {e}")
-        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
+        logging.error(f"Ошибка при сохранении обратной связи: {e}")
+        return jsonify({'error': 'Ошибка при сохранении обратной связи'}), 500
 
 def save_feedback(question, answer, feedback):
     if not os.path.exists(Config.FEEDBACK_FILE):
