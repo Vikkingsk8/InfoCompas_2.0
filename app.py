@@ -20,10 +20,6 @@ app.secret_key = os.getenv('SECRET_KEY', 'your_default_secret_key')
 
 logging.basicConfig(level=logging.INFO)
 
-# Убедитесь, что вы скачали необходимые данные NLTK
-import nltk
-nltk.download('stopwords')
-nltk.download('punkt')
 
 class Config:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -97,9 +93,9 @@ def preprocess_text(text):
     # Удаление знаков препинания и приведение к нижнему регистру
     text = re.sub(r'[^\w\s]', '', text.lower())
     # Токенизация текста
-    words = word_tokenize(text)
+    words = text.split()
     # Удаление вопросительных слов и стоп-слов
-    filtered_words = [word for word in words if word not in question_words and word not in stopwords.words('russian')]
+    filtered_words = [word for word in words if word not in question_words]
     return set(filtered_words)  # Возвращаем множество слов
 
 # Предобработка и индексация вопросов из базы данных
