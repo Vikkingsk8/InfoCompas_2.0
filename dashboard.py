@@ -3,6 +3,8 @@ from dash.dependencies import Input, Output
 import plotly.express as px
 import pandas as pd
 import requests
+from openpyxl import Workbook
+from io import BytesIO
 
 def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
     dash_app = Dash(__name__, server=flask_app, routes_pathname_prefix=routes_pathname_prefix)
@@ -32,6 +34,8 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
                 dcc.Graph(id='feedback-distribution'),
             ], style={'width': '50%', 'display': 'inline-block'}),
         ]),
+        html.Button("Экспорт в Excel", id="export-button", n_clicks=0),
+        dcc.Download(id="download-excel")
     ], style={
         'backgroundImage': 'url("/static/background.jpg")',
         'backgroundSize': 'cover',
@@ -95,5 +99,60 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
         feedback_fig = px.pie(feedback_df, values='count', names='feedback', title="Распределение обратной связи")
         
         return metrics, queries_fig, queries_by_day_fig, queries_by_week_fig, queries_by_month_fig, top_questions_fig, feedback_fig
+
+    @dash_app.callback(
+        Output("download-excel", "data"),
+        Input("export-button", "n_clicks"),
+        prevent_initial_call=True
+    )
+    def export_to_excel(n_clicks):
+        if n_clicks == 0:
+            return None
+        
+        try:
+            response = requests.get('http://176.109.109.61:8080/analytics_data')
+            response.raise_for_status()
+            data = response.json()
+        except requests.RequestException as e:
+            print(f"Ошибка при запросе к API: {e}")
+            return None
+
+        wb = Workbook()
+        
+        # Создаем листы и заполняем их данными
+        ws = wb.active
+        ws.title = "Общая статистика"
+        ws.append(["Метрика", "Значение"])
+        ws.append(["Всего запросов", data['total_queries']])
+        ws.append(["Успешных запросов", data['successful_queries']])
+        ws.append(["Процент успешных запросов", f"{data['success_rate']:.2f}%"])
+
+        for sheet_name, sheet_data in [
+            ("Запросы по времени", data['queries_over_time']),
+            ("Запросы по дням", data['queries_by_day']),
+            ("Запросы по неделям", data['queries_by_week']),
+            ("Запросы по месяцам", data['queries_by_month']),
+        ]:
+            ws = wb.create_sheet(sheet_name)
+            ws.append(["Время", "Количество"])
+            for time, count in sheet_data.items():
+                ws.append([time, count])
+
+        ws = wb.create_sheet("Топ вопросов")
+        ws.append(["Вопрос", "Количество"])
+        for question in data['top_questions']:
+            ws.append(question)
+
+        ws = wb.create_sheet("Обратная связь")
+        ws.append(["Оценка", "Количество"])
+        for feedback, count in data['feedback_distribution'].items():
+            ws.append([feedback, count])
+
+        # Сохраняем файл в памяти
+        excel_buffer = BytesIO()
+        wb.save(excel_buffer)
+        excel_buffer.seek(0)
+
+        return dcc.send_file(excel_buffer, "dashboard_data.xlsx")
 
     return dash_app
