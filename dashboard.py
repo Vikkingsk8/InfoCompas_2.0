@@ -9,6 +9,7 @@ from config import Config
 
 def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
     dash_app = Dash(__name__, server=flask_app, routes_pathname_prefix=routes_pathname_prefix)
+    
     dash_app.layout = html.Div([
         html.H1("Аналитика чат-бота", style={'textAlign': 'center', 'color': '#000000', 'padding': '20px'}),
         dcc.Interval(
@@ -18,22 +19,12 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
         ),
         html.Div(id='metrics-container', style={'textAlign': 'center', 'margin': '20px', 'backgroundColor': 'rgba(255, 255, 255, 0.7)', 'padding': '10px', 'borderRadius': '10px'}),
         html.Div([
-            html.Div([
-                dcc.Graph(id='users-and-queries'),
-                dcc.Graph(id='queries-by-day'),
-            ], style={'width': '50%', 'display': 'inline-block'}),
-            html.Div([
-                dcc.Graph(id='queries-by-week'),
-                dcc.Graph(id='queries-by-month'),
-            ], style={'width': '50%', 'display': 'inline-block'}),
-        ]),
-        html.Div([
-            html.Div([
-                dcc.Graph(id='top-questions'),
-            ], style={'width': '50%', 'display': 'inline-block'}),
-            html.Div([
-                dcc.Graph(id='feedback-distribution'),
-            ], style={'width': '50%', 'display': 'inline-block'}),
+            dcc.Graph(id='users-and-queries'),
+            dcc.Graph(id='queries-by-day'),
+            dcc.Graph(id='queries-by-week'),
+            dcc.Graph(id='queries-by-month'),
+            dcc.Graph(id='top-questions'),
+            dcc.Graph(id='feedback-distribution'),
         ]),
         html.Button("Экспорт в Excel", id="export-button", n_clicks=0),
         dcc.Download(id="download-excel"),
@@ -56,7 +47,8 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
          Output('queries-by-week', 'figure'),
          Output('queries-by-month', 'figure'),
          Output('top-questions', 'figure'),
-         Output('feedback-distribution', 'figure')],
+         Output('feedback-distribution', 'figure'),
+         Output('debug-info', 'children')],
         Input('interval-component', 'n_intervals')
     )
     def update_metrics(n):
@@ -69,13 +61,13 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
             
             if not data or all(not value for value in data.values()):
                 print("Получены пустые данные")
-                return html.Div("Нет доступных данных"), {}, {}, {}, {}, {}, {}
+                return html.Div("Нет доступных данных"), {}, {}, {}, {}, {}, {}, "Получены пустые данные"
             
-            # Проверка наличия ключей в полученных данных
-            expected_keys = ['total_queries', 'successful_queries', 'success_rate', 'queries_by_day', 'queries_by_week', 'queries_by_month', 'top_questions']
-            for key in expected_keys:
-                if key not in data:
-                    print(f"Отсутствует ключ {key} в полученных данных")
+            expected_keys = ['total_queries', 'successful_queries', 'success_rate', 'queries_by_day', 'queries_by_week', 'queries_by_month', 'top_questions', 'users_and_queries_by_day']
+            missing_keys = [key for key in expected_keys if key not in data]
+            if missing_keys:
+                print(f"Отсутствуют следующие ключи в полученных данных: {', '.join(missing_keys)}")
+                return html.Div(f"Ошибка: отсутствуют необходимые данные ({', '.join(missing_keys)})"), {}, {}, {}, {}, {}, {}, f"Отсутствуют ключи: {', '.join(missing_keys)}"
             
             try:
                 feedback_df = pd.read_excel(Config.FEEDBACK_FILE)
@@ -93,7 +85,6 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
                 html.P(f"Дизлайков: {total_dislikes}"),
             ]
             
-            # График уникальных пользователей и запросов по дням
             users_queries_df = pd.DataFrame(data['users_and_queries_by_day'], columns=['date', 'unique_users', 'queries'])
             users_queries_df['date'] = pd.to_datetime(users_queries_df['date'])
             users_queries_fig = px.line(users_queries_df, x='date', y=['unique_users', 'queries'], 
@@ -102,25 +93,20 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
                                         color_discrete_map={'unique_users': 'blue', 'queries': 'red'})
             users_queries_fig.update_layout(legend_title_text='')
             
-            # График запросов по дням
             queries_by_day = pd.DataFrame(list(data['queries_by_day'].items()), columns=['day', 'count'])
             queries_by_day['day'] = pd.to_datetime(queries_by_day['day'])
             queries_by_day_fig = px.bar(queries_by_day, x='day', y='count', title="Запросы по дням")
             
-            # График запросов по неделям
             queries_by_week = pd.DataFrame(list(data['queries_by_week'].items()), columns=['week', 'count'])
             queries_by_week_fig = px.bar(queries_by_week, x='week', y='count', title="Запросы по неделям")
             
-            # График запросов по месяцам
             queries_by_month = pd.DataFrame(list(data['queries_by_month'].items()), columns=['month', 'count'])
             queries_by_month_fig = px.bar(queries_by_month, x='month', y='count', title="Запросы по месяцам")
             
-            # График топ-10 вопросов
             top_questions = pd.DataFrame(data['top_questions'], columns=['question', 'count'])
             top_questions = top_questions.sort_values('count', ascending=True).tail(10)
             top_questions_fig = px.bar(top_questions, x='count', y='question', orientation='h', title="Топ-10 вопросов")
             
-            # График распределения лайков и дизлайков
             feedback_data = {
                 'Тип': ['Лайки', 'Дизлайки'],
                 'Количество': [total_likes, total_dislikes]
@@ -131,7 +117,6 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
                                   color='Тип',
                                   color_discrete_map={'Лайки': 'green', 'Дизлайки': 'red'})
             
-            # Обновление стилей для всех графиков
             for fig in [users_queries_fig, queries_by_day_fig, queries_by_week_fig, queries_by_month_fig, top_questions_fig, feedback_fig]:
                 fig.update_layout(
                     plot_bgcolor='rgba(255, 255, 255, 0.7)',
@@ -139,10 +124,10 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
                 )
             
             print("Обновление метрик завершено успешно")
-            return metrics, users_queries_fig, queries_by_day_fig, queries_by_week_fig, queries_by_month_fig, top_questions_fig, feedback_fig
+            return metrics, users_queries_fig, queries_by_day_fig, queries_by_week_fig, queries_by_month_fig, top_questions_fig, feedback_fig, "Обновление выполнено успешно"
         except Exception as e:
             print(f"Ошибка при обновлении метрик: {e}")
-            return html.Div(f"Ошибка при получении данных: {e}"), {}, {}, {}, {}, {}, {}
+            return html.Div(f"Ошибка при получении данных: {str(e)}"), {}, {}, {}, {}, {}, {}, f"Ошибка: {str(e)}"
 
     @dash_app.callback(
         Output("download-excel", "data"),
@@ -167,7 +152,6 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
 
         wb = Workbook()
         
-        # Создаем листы и заполняем их данными
         ws = wb.active
         ws.title = "Общая статистика"
         ws.append(["Метрика", "Значение"])
@@ -202,7 +186,6 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
         ws.append(["Лайки", total_likes])
         ws.append(["Дизлайки", total_dislikes])
 
-        # Сохраняем файл в памяти
         excel_buffer = BytesIO()
         wb.save(excel_buffer)
         excel_buffer.seek(0)
