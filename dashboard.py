@@ -5,7 +5,7 @@ import pandas as pd
 import requests
 
 def create_dash_app(flask_app, requests_pathname_prefix='/dashboard/'):
-    dash_app = Dash(__name__, server=flask_app, url_base_pathname=requests_pathname_prefix,
+    dash_app = Dash(__name__, server=flask_app, 
                     requests_pathname_prefix=requests_pathname_prefix)
 
     dash_app.layout = html.Div([
