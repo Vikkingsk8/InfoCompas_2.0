@@ -5,7 +5,7 @@ import pandas as pd
 import requests
 from openpyxl import Workbook
 from io import BytesIO
-from app import Config
+from config import Config
 
 def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
     dash_app = Dash(__name__, server=flask_app, routes_pathname_prefix=routes_pathname_prefix)
