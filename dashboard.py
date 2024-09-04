@@ -4,10 +4,8 @@ import plotly.express as px
 import pandas as pd
 import requests
 
-def create_dash_app(flask_app, requests_pathname_prefix='/dashboard/'):
-    dash_app = Dash(__name__, server=flask_app, 
-                    requests_pathname_prefix=requests_pathname_prefix)
-
+def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
+    dash_app = Dash(__name__, server=flask_app, routes_pathname_prefix=routes_pathname_prefix)
     dash_app.layout = html.Div([
         html.H1("Аналитика чат-бота"),
         dcc.Interval(
