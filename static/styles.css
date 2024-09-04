@@ -384,6 +384,40 @@ body {
     transform: translateY(0);
 }
 
+.initial-questions-container {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    margin-top: 5px;
+}
+
+.initial-question-btn {
+    display: inline-block;
+    margin: 5px;
+    padding: 5px 10px;
+    background-color: #a12ccf;
+    color: rgb(255, 255, 255);
+    text-decoration: none;
+    border-radius: 5px;
+    cursor: pointer;
+    border: none;
+    animation: fadeInUp 0.8s ease forwards;
+    opacity: 0;
+    transform: translateY(20px);
+}
+
+.initial-question-btn:hover {
+    background-color: #9e2fa5;
+}
+
+@keyframes fadeInUp {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 /* Медиа-запросы для адаптивности под смартфоны */
 @media (max-width: 600px) {
     .header {
@@ -498,10 +532,26 @@ body {
     .chat-box::-webkit-scrollbar-thumb:hover {
         background: #555;
     }
+    .feedback-container,
+    .feedback-button {
+        display: none !important;
+    }
 }
     /* Дополнительный медиа-запрос для горизонтального режима */
     @media (max-height: 600px) and (orientation: landscape) {
         .toggle-button {
             display: none !important;
         }
+
+        .feedback-button {
+            display: none !important;
+        }
+
+        .user-message,
+        .bot-message {
+        max-width: 80% !important; /* Уменьшаем максимальную ширину сообщений в горизонтальном режиме */
+        word-wrap: break-word !important; /* Перенос слов для предотвращения выхода за пределы контейнера */
+        overflow-wrap: break-word !important; /* Дополнительный перенос слов */
+        white-space: normal !important; /* Убедитесь, что текст всегда переносится на новую строку */
+    }
     }

@@ -7,20 +7,40 @@ import requests
 def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
     dash_app = Dash(__name__, server=flask_app, routes_pathname_prefix=routes_pathname_prefix)
     dash_app.layout = html.Div([
-        html.H1("Аналитика чат-бота"),
+        html.H1("Аналитика чат-бота", style={'textAlign': 'center', 'color': '#ffffff', 'padding': '20px'}),
         dcc.Interval(
             id='interval-component',
-            interval=60*1000,  # обновление каждую минуту
+            interval=60*1000,
             n_intervals=0
         ),
-        html.Div(id='metrics-container'),
-        dcc.Graph(id='queries-over-time'),
-        dcc.Graph(id='queries-by-day'),
-        dcc.Graph(id='queries-by-week'),
-        dcc.Graph(id='queries-by-month'),
-        dcc.Graph(id='top-questions'),
-        dcc.Graph(id='feedback-distribution')
-    ])
+        html.Div(id='metrics-container', style={'textAlign': 'center', 'margin': '20px', 'backgroundColor': 'rgba(255, 255, 255, 0.7)', 'padding': '10px', 'borderRadius': '10px'}),
+        html.Div([
+            html.Div([
+                dcc.Graph(id='queries-over-time'),
+                dcc.Graph(id='queries-by-day'),
+            ], style={'width': '50%', 'display': 'inline-block'}),
+            html.Div([
+                dcc.Graph(id='queries-by-week'),
+                dcc.Graph(id='queries-by-month'),
+            ], style={'width': '50%', 'display': 'inline-block'}),
+        ]),
+        html.Div([
+            html.Div([
+                dcc.Graph(id='top-questions'),
+            ], style={'width': '50%', 'display': 'inline-block'}),
+            html.Div([
+                dcc.Graph(id='feedback-distribution'),
+            ], style={'width': '50%', 'display': 'inline-block'}),
+        ]),
+    ], style={
+        'backgroundImage': 'url("/static/background.jpg")',
+        'backgroundSize': 'cover',
+        'backgroundRepeat': 'no-repeat',
+        'backgroundAttachment': 'fixed',
+        'backgroundPosition': 'center',
+        'padding': '20px',
+        'minHeight': '100vh'
+    })
 
     @dash_app.callback(
         [Output('metrics-container', 'children'),

@@ -51,8 +51,32 @@
         let suggestions = [];
 
         // Приветствие при запуске
-        prependMessage("Привет! Я ИнфоКомпас, ваш виртуальный помощник. Чем могу помочь?", 'bot-message', '{{ url_for('static', filename='bot_icon.png') }}');
-
+        function showWelcomeMessage() {
+            const welcomeMessage = "Привет! Я ИнфоКомпас, ваш виртуальный помощник. Чем могу помочь?";
+            prependMessage(welcomeMessage, 'bot-message', '{{ url_for('static', filename='bot_icon.png') }}');
+            
+            // Создаем контейнер для кнопок с начальными вопросами
+            const buttonsContainer = document.createElement('div');
+            buttonsContainer.classList.add('initial-questions-container');
+            
+            // Добавляем кнопки с начальными вопросами
+            {{ initial_questions | tojson }}.forEach(question => {
+                const button = document.createElement('button');
+                button.textContent = question;
+                button.classList.add('initial-question-btn');
+                button.addEventListener('click', () => {
+                    inputField.value = question;
+                    sendMessage();
+                });
+                buttonsContainer.appendChild(button);
+            });
+            
+            // Добавляем контейнер с кнопками в начало чат-бокса
+            chatBox.insertBefore(buttonsContainer, chatBox.firstChild);
+        }
+    
+        // Вызываем функцию приветствия при загрузке страницы
+        showWelcomeMessage();
         // Загрузка предложений для автодополнения
         async function loadSuggestions() {
             const response = await fetch('/load_suggestions');
@@ -147,9 +171,14 @@
             linkButton.textContent = link.question.replace('?', '').trim();
             linkButton.target = '_blank';
             linkButton.classList.add('link-button', 'fade-in');
-            linkButton.addEventListener('click', (event) => {
+        
+            const handleClick = async (event) => {
                 event.preventDefault();
-                sendLinkQuestion(link.question, link.url);
+                console.log('Button clicked');
+        
+                // Отправка вопроса на сервер
+                await sendLinkQuestion(link.question, link.url);
+        
                 // Открытие ссылки в новой вкладке через форму
                 const form = document.createElement('form');
                 form.method = 'GET';
@@ -158,7 +187,13 @@
                 document.body.appendChild(form);
                 form.submit();
                 document.body.removeChild(form);
-            });
+        
+                // Удаление обработчика события после выполнения
+                linkButton.removeEventListener('click', handleClick);
+            };
+        
+            linkButton.addEventListener('click', handleClick, { once: true });
+        
             return linkButton;
         }
 
@@ -233,23 +268,23 @@
             if (question !== '') {
                 lastQuestion = question;
                 prependMessage(question, 'user-message', '{{ url_for('static', filename='user_icon.png') }}');
-
+        
                 const loadingMessage = prependMessage('Генерация ответа...', 'loading-message');
-
+        
                 try {
                     const response = await fetch('/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ question, previous_answers: previousAnswers })
                     });
-
+        
                     const data = await response.json();
                     loadingMessage.remove();
-
+        
                     const messageElement = prependMessage(data.answer, 'bot-message', '{{ url_for('static', filename='bot_icon.png') }}', data.images, data.pdf_page);
-
+        
                     clearLinksContainer();
-
+        
                     if (data.links && data.links.length > 0) {
                         const newLinksContainer = createLinksContainer(data.links);
                         chatBox.insertBefore(newLinksContainer, chatBox.firstChild);
@@ -261,15 +296,13 @@
                         chatBox.insertBefore(noLinkContainer, chatBox.firstChild);
                         setTimeout(scrollToBottom, 100);
                     }
-
+        
                     if (data.feedback && !isGreeting(question)) {
                         previousAnswers.push(data.answer);
                         addFeedbackButtons(messageElement, question, data.answer);
                     } else {
                         previousAnswers = [];
                     }
-
-                    if (url) window.open(url, '_blank');
                 } catch (error) {
                     console.error("Error sending link question:", error);
                     loadingMessage.remove();
@@ -326,7 +359,7 @@
                 const response = await fetch(`/${feedbackType}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ feedback })
+                    body: JSON.stringify({ question: feedback.question, answer: feedback.answer })
                 });
 
                 if (!response.ok) {

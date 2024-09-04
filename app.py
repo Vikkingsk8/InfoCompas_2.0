@@ -39,6 +39,7 @@ class Config:
     LINKS_PATH = os.getenv('LINKS_PATH', os.path.join(DATA_DIR, 'links.xlsx'))
     PDF_PATH = os.getenv('PDF_PATH', os.path.join(DATA_DIR, 'instruction.pdf'))
     FEEDBACK_FILE = os.path.join(DATA_DIR, 'feedback.xlsx')
+    CROSSROAD_FILE = os.path.join(DATA_DIR, 'развилка.xlsx')
 
 tokenizer = AutoTokenizer.from_pretrained("cointegrated/rubert-tiny2")
 model = AutoModel.from_pretrained("cointegrated/rubert-tiny2")
@@ -184,6 +185,14 @@ conversational_responses = {
     "как тебя зовут": "Меня зовут ИнфоКомпас. Я здесь, чтобы помочь вам найти информацию."
 }
 
+def load_initial_questions():
+    try:
+        df = pd.read_excel(os.path.join(Config.DATA_DIR, 'развилка.xlsx'))
+        questions = df['Вопрос'].tolist()[:5]
+        return questions
+    except Exception as e:
+        logging.error(f"Ошибка при загрузке начальных вопросов: {e}")
+        return []
 
 
 @app.route('/download_pdf')
@@ -198,7 +207,8 @@ def load_suggestions():
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    initial_questions = load_initial_questions()
+    return render_template('index.html', initial_questions=initial_questions)
 
 @app.route('/chat', methods=['POST'])
 def chat():
