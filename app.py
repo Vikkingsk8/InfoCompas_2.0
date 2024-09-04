@@ -20,7 +20,7 @@ from dashboard import create_dash_app
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your_default_secret_key')
-dash_app = create_dash_app(app, requests_pathname_prefix='/dashboard/')
+dash_app = create_dash_app(app, routes_pathname_prefix='/dashboard/')
 
 logging.basicConfig(level=logging.INFO)
 
