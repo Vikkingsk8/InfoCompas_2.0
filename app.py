@@ -13,13 +13,22 @@ import time
 import re
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
-from collections import defaultdict
+from collections import defaultdict, Counter
+import datetime
+import requests
+from dashboard import create_dash_app
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your_default_secret_key')
+dash_app = create_dash_app(app, requests_pathname_prefix='/dashboard/')
 
 logging.basicConfig(level=logging.INFO)
 
+# Глобальные переменные для отслеживания метрик
+total_queries = 0
+successful_queries = 0
+query_history = []
+feedback_history = []
 
 class Config:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -58,8 +67,11 @@ def load_excel_data(path):
 
 def preprocess_excel_data(df, column_name):
     df = df.assign(Текст_вопроса=df[column_name].str.split('?')).explode('Текст_вопроса')
-    df['Текст_вопроса'] = df['Текст_вопроса'].str.lower().str.strip()
+    df['Текст_вопроса'] = df['Текст_вопроса'].str.lower().str.strip().replace('ё', 'е')
     return df
+
+def preprocess_user_question(question):
+    return question.lower().strip().replace('ё', 'е')
 
 df_answers = load_excel_data(Config.EXCEL_PATH)
 df_answers = preprocess_excel_data(df_answers, 'Текст вопроса')
@@ -84,12 +96,18 @@ tokenized_corpus = [doc.split() for doc in df_answers['Текст_вопроса
 bm25 = BM25Okapi(tokenized_corpus)
 
 # Список вопросительных слов и фраз для игнорирования
-question_words = set(['что', 'такое', 'это', 'почему', 'расскажи', 'как', 'что значит', 'кто', 'где', 'когда', 'сколько', 'какой', 'какая', 'какие', 'чем', 'зачем', 'дел ам', 'дел', 'где найти', 'найти', 'как найти', 'как это сделать'])
+question_words = set(['что', 'такое', 'это', 'почему', 
+                      'расскажи', 'как', 'что значит', 'кто', 'где', 'когда', 
+                      'сколько', 'какой', 'какая', 'какие', 'чем', 'зачем', 
+                      'дел ам', 'дел', 'где найти', 'найти', 'как найти', 
+                      'как это сделать', 'что делать'])
 
 # Создаем индекс при загрузке данных
 question_index = defaultdict(set)
 
 def preprocess_text(text):
+    # Замена "ё" на "е"
+    text = text.replace('ё', 'е').replace('Ё', 'Е')
     # Удаление знаков препинания и приведение к нижнему регистру
     text = re.sub(r'[^\w\s]', '', text.lower())
     # Токенизация текста
@@ -150,6 +168,7 @@ def find_best_answer(query, embedding_weight=0.7, levenshtein_weight=0.15, bm25_
         return None, None
 
 def find_relevant_links(user_question, threshold=0.3):
+    user_question = preprocess_user_question(user_question)
     links_questions = df_links['Текст_вопроса'].tolist()
     links_vectorizer = TfidfVectorizer()
     links_tfidf_matrix = links_vectorizer.fit_transform(links_questions)
@@ -164,6 +183,7 @@ conversational_responses = {
     "что ты умеешь": "Я могу отвечать на ваши вопросы на основе предоставленных данных.",
     "как тебя зовут": "Меня зовут ИнфоКомпас. Я здесь, чтобы помочь вам найти информацию."
 }
+
 
 
 @app.route('/download_pdf')
@@ -182,8 +202,10 @@ def index():
 
 @app.route('/chat', methods=['POST'])
 def chat():
+    global total_queries, successful_queries, query_history
     try:
         user_question = request.json.get('question')
+        user_question = preprocess_user_question(user_question)
         if 'last_link_question' in session and session['last_link_question'] == user_question:
             return jsonify({'answer': f"Вы нажали на ссылку с вопросом: {user_question}", 'feedback': False})
         if len(user_question.strip()) < 2:
@@ -200,7 +222,11 @@ def chat():
         logging.info(f"Вопрос пользователя: {user_question}")
         logging.info(f"Валидность вопроса: {is_valid}")
         
+        total_queries += 1
+        query_time = datetime.datetime.now()
+        
         if not is_valid:
+            query_history.append({'time': query_time, 'question': user_question, 'success': False})
             return jsonify({'answer': "Извините, я не совсем понял ваш вопрос. Пожалуйста, перефразируйте его или задайте более конкретный вопрос.", 'feedback': False})
         
         # Если вопрос валидный, ищем ответ на оригинальный вопрос пользователя
@@ -210,7 +236,11 @@ def chat():
         logging.info(f"Совпавший вопрос: {matched_question}")
         
         if answer is None:
+            query_history.append({'time': query_time, 'question': user_question, 'success': False})
             return jsonify({'answer': "Извините, я не могу найти подходящий ответ на ваш вопрос. Пожалуйста, перефразируйте его или задайте другой вопрос.", 'feedback': False})
+        
+        successful_queries += 1
+        query_history.append({'time': query_time, 'question': user_question, 'success': True})
         
         links = find_relevant_links(user_question_lower)
         formatted_links = [{'question': row['Текст_вопроса'], 'url': row['Ссылка']} for _, row in links.iterrows() if row['Ссылка']]
@@ -222,6 +252,7 @@ def chat():
 
 @app.route('/feedback', methods=['POST'])
 def feedback():
+    global feedback_history
     data = request.json
     question = data.get('question')
     answer = data.get('answer')
@@ -242,6 +273,15 @@ def feedback():
         })
         df = pd.concat([df, new_feedback], ignore_index=True)
         df.to_excel(Config.FEEDBACK_FILE, index=False)
+        
+        feedback_history.append({
+            'time': pd.Timestamp.now(),
+            'question': question,
+            'answer': answer,
+            'feedback_type': feedback_type,
+            'comment': comment
+        })
+        
         return jsonify({'message': 'Спасибо за ваш отзыв!'}), 200
     except Exception as e:
         logging.error(f"Ошибка при сохранении обратной связи: {e}")
@@ -298,6 +338,56 @@ def dislike():
     except Exception as e:
         logging.error(f"Ошибка в /dislike: {e}")
         return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
+
+@app.route('/dashboard/')
+def render_dashboard():
+    return dash_app.index()
+
+@app.route('/analytics_data', methods=['GET'])
+def get_analytics_data():
+    try:
+        global total_queries, successful_queries, query_history, feedback_history
+        
+        success_rate = (successful_queries / total_queries) * 100 if total_queries > 0 else 0
+        
+        questions = [q['question'] for q in query_history]
+        top_questions = Counter(questions).most_common(10)
+        
+        feedback_types = [f['feedback_type'] for f in feedback_history]
+        feedback_distribution = dict(Counter(feedback_types))
+        
+        df = pd.DataFrame(query_history)
+        if not df.empty:
+            df['time'] = pd.to_datetime(df['time'])
+            df['day'] = df['time'].dt.date
+            df['week'] = df['time'].dt.to_period('W').astype(str)
+            df['month'] = df['time'].dt.to_period('M').astype(str)
+            
+            queries_over_time = df.groupby('time').size().to_dict()
+            queries_by_day = df.groupby('day').size().to_dict()
+            queries_by_week = df.groupby('week').size().to_dict()
+            queries_by_month = df.groupby('month').size().to_dict()
+        else:
+            queries_over_time = {}
+            queries_by_day = {}
+            queries_by_week = {}
+            queries_by_month = {}
+        
+        return jsonify({
+            'total_queries': total_queries,
+            'successful_queries': successful_queries,
+            'success_rate': success_rate,
+            'top_questions': top_questions,
+            'feedback_distribution': feedback_distribution,
+            'queries_over_time': {str(k): v for k, v in queries_over_time.items()},
+            'queries_by_day': {str(k): v for k, v in queries_by_day.items()},
+            'queries_by_week': {str(k): v for k, v in queries_by_week.items()},
+            'queries_by_month': {str(k): v for k, v in queries_by_month.items()}
+        })
+    except Exception as e:
+        app.logger.error(f"Ошибка в /analytics_data: {str(e)}")
+        return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
