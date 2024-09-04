@@ -108,7 +108,7 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
     def export_to_excel(n_clicks):
         if n_clicks == 0:
             return None
-        
+    
         try:
             response = requests.get('http://176.109.109.61:8080/analytics_data')
             response.raise_for_status()
@@ -118,7 +118,7 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
             return None
 
         wb = Workbook()
-        
+    
         # Создаем листы и заполняем их данными
         ws = wb.active
         ws.title = "Общая статистика"
@@ -153,6 +153,6 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
         wb.save(excel_buffer)
         excel_buffer.seek(0)
 
-        return dcc.send_file(excel_buffer, "dashboard_data.xlsx")
+        return dcc.send_bytes(excel_buffer.getvalue(), "dashboard_data.xlsx")
 
     return dash_app
