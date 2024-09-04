@@ -5,11 +5,12 @@ import pandas as pd
 import requests
 from openpyxl import Workbook
 from io import BytesIO
+from app import Config
 
 def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
     dash_app = Dash(__name__, server=flask_app, routes_pathname_prefix=routes_pathname_prefix)
     dash_app.layout = html.Div([
-        html.H1("Аналитика чат-бота", style={'textAlign': 'center', 'color': '#ffffff', 'padding': '20px'}),
+        html.H1("Аналитика чат-бота", style={'textAlign': 'center', 'color': '#000000', 'padding': '20px'}),
         dcc.Interval(
             id='interval-component',
             interval=60*1000,
@@ -18,7 +19,7 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
         html.Div(id='metrics-container', style={'textAlign': 'center', 'margin': '20px', 'backgroundColor': 'rgba(255, 255, 255, 0.7)', 'padding': '10px', 'borderRadius': '10px'}),
         html.Div([
             html.Div([
-                dcc.Graph(id='queries-over-time'),
+                dcc.Graph(id='users-and-queries'),
                 dcc.Graph(id='queries-by-day'),
             ], style={'width': '50%', 'display': 'inline-block'}),
             html.Div([
@@ -48,7 +49,7 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
 
     @dash_app.callback(
         [Output('metrics-container', 'children'),
-         Output('queries-over-time', 'figure'),
+         Output('users-and-queries', 'figure'),
          Output('queries-by-day', 'figure'),
          Output('queries-by-week', 'figure'),
          Output('queries-by-month', 'figure'),
@@ -61,20 +62,30 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
             response = requests.get('http://176.109.109.61:8080/analytics_data')
             response.raise_for_status()
             data = response.json()
-        except requests.RequestException as e:
-            print(f"Ошибка при запросе к API: {e}")
+            
+            feedback_df = pd.read_excel(Config.FEEDBACK_FILE)
+            total_likes = feedback_df['likes'].sum()
+            total_dislikes = feedback_df['dislikes'].sum()
+        except Exception as e:
+            print(f"Ошибка при получении данных: {e}")
             return html.Div("Ошибка при получении данных"), {}, {}, {}, {}, {}, {}
 
         metrics = [
             html.P(f"Всего запросов: {data['total_queries']}"),
             html.P(f"Успешных запросов: {data['successful_queries']}"),
             html.P(f"Процент успешных запросов: {data['success_rate']:.2f}%"),
+            html.P(f"Лайков: {total_likes}"),
+            html.P(f"Дизлайков: {total_dislikes}"),
         ]
         
-        # График запросов по времени
-        queries_df = pd.DataFrame(list(data['queries_over_time'].items()), columns=['time', 'count'])
-        queries_df['time'] = pd.to_datetime(queries_df['time'])
-        queries_fig = px.line(queries_df, x='time', y='count', title="Запросы по времени")
+        # График уникальных пользователей и запросов по дням
+        users_queries_df = pd.DataFrame(data['users_and_queries_by_day'], columns=['date', 'unique_users', 'queries'])
+        users_queries_df['date'] = pd.to_datetime(users_queries_df['date'])
+        users_queries_fig = px.line(users_queries_df, x='date', y=['unique_users', 'queries'], 
+                                    title="Уникальные пользователи и запросы по дням",
+                                    labels={'value': 'Количество', 'variable': 'Тип'},
+                                    color_discrete_map={'unique_users': 'blue', 'queries': 'red'})
+        users_queries_fig.update_layout(legend_title_text='')
         
         # График запросов по дням
         queries_by_day = pd.DataFrame(list(data['queries_by_day'].items()), columns=['day', 'count'])
@@ -94,11 +105,25 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
         top_questions = top_questions.sort_values('count', ascending=True).tail(10)
         top_questions_fig = px.bar(top_questions, x='count', y='question', orientation='h', title="Топ-10 вопросов")
         
-        # График распределения обратной связи
-        feedback_df = pd.DataFrame(list(data['feedback_distribution'].items()), columns=['feedback', 'count'])
-        feedback_fig = px.pie(feedback_df, values='count', names='feedback', title="Распределение обратной связи")
+        # График распределения лайков и дизлайков
+        feedback_data = {
+            'Тип': ['Лайки', 'Дизлайки'],
+            'Количество': [total_likes, total_dislikes]
+        }
+        feedback_df = pd.DataFrame(feedback_data)
+        feedback_fig = px.pie(feedback_df, values='Количество', names='Тип', 
+                              title="Распределение лайков и дизлайков",
+                              color='Тип',
+                              color_discrete_map={'Лайки': 'green', 'Дизлайки': 'red'})
         
-        return metrics, queries_fig, queries_by_day_fig, queries_by_week_fig, queries_by_month_fig, top_questions_fig, feedback_fig
+        # Обновление стилей для всех графиков
+        for fig in [users_queries_fig, queries_by_day_fig, queries_by_week_fig, queries_by_month_fig, top_questions_fig, feedback_fig]:
+            fig.update_layout(
+                plot_bgcolor='rgba(255, 255, 255, 0.7)',
+                paper_bgcolor='rgba(255, 255, 255, 0.7)'
+            )
+        
+        return metrics, users_queries_fig, queries_by_day_fig, queries_by_week_fig, queries_by_month_fig, top_questions_fig, feedback_fig
 
     @dash_app.callback(
         Output("download-excel", "data"),
@@ -108,17 +133,21 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
     def export_to_excel(n_clicks):
         if n_clicks == 0:
             return None
-    
+        
         try:
             response = requests.get('http://176.109.109.61:8080/analytics_data')
             response.raise_for_status()
             data = response.json()
-        except requests.RequestException as e:
-            print(f"Ошибка при запросе к API: {e}")
+            
+            feedback_df = pd.read_excel(Config.FEEDBACK_FILE)
+            total_likes = feedback_df['likes'].sum()
+            total_dislikes = feedback_df['dislikes'].sum()
+        except Exception as e:
+            print(f"Ошибка при получении данных: {e}")
             return None
 
         wb = Workbook()
-    
+        
         # Создаем листы и заполняем их данными
         ws = wb.active
         ws.title = "Общая статистика"
@@ -126,9 +155,15 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
         ws.append(["Всего запросов", data['total_queries']])
         ws.append(["Успешных запросов", data['successful_queries']])
         ws.append(["Процент успешных запросов", f"{data['success_rate']:.2f}%"])
+        ws.append(["Лайков", total_likes])
+        ws.append(["Дизлайков", total_dislikes])
+
+        ws = wb.create_sheet("Пользователи и запросы по дням")
+        ws.append(["Дата", "Уникальные пользователи", "Запросы"])
+        for item in data['users_and_queries_by_day']:
+            ws.append(item)
 
         for sheet_name, sheet_data in [
-            ("Запросы по времени", data['queries_over_time']),
             ("Запросы по дням", data['queries_by_day']),
             ("Запросы по неделям", data['queries_by_week']),
             ("Запросы по месяцам", data['queries_by_month']),
@@ -144,9 +179,9 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
             ws.append(question)
 
         ws = wb.create_sheet("Обратная связь")
-        ws.append(["Оценка", "Количество"])
-        for feedback, count in data['feedback_distribution'].items():
-            ws.append([feedback, count])
+        ws.append(["Тип", "Количество"])
+        ws.append(["Лайки", total_likes])
+        ws.append(["Дизлайки", total_dislikes])
 
         # Сохраняем файл в памяти
         excel_buffer = BytesIO()
