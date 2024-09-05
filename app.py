@@ -71,6 +71,9 @@ df_answers = preprocess_excel_data(df_answers, 'Текст вопроса')
 df_links = load_excel_data(Config.LINKS_PATH)
 df_links = preprocess_excel_data(df_links, 'Вопрос')
 
+df_fork = load_excel_data(Config.CROSSROAD_FILE)
+df_fork = preprocess_excel_data(df_fork, 'Вопрос')
+
 start_time = time.time()
 df_answers['embedding'] = df_answers['Текст_вопроса'].apply(lambda x: embeddings_cache.get(x) if x in embeddings_cache else get_embedding(x))
 end_time = time.time()
@@ -169,6 +172,16 @@ def find_relevant_links(user_question, threshold=0.3):
     relevant_indices = [i for i, sim in enumerate(similarity) if sim > threshold]
     return df_links.iloc[relevant_indices]
 
+def find_relevant_fork_links(user_question, threshold=0.3):
+    user_question = preprocess_user_question(user_question)
+    fork_questions = df_fork['Вопрос'].tolist()
+    fork_vectorizer = TfidfVectorizer()
+    fork_tfidf_matrix = fork_vectorizer.fit_transform(fork_questions)
+    user_vector = fork_vectorizer.transform([user_question])
+    similarity = cosine_similarity(user_vector, fork_tfidf_matrix).flatten()
+    relevant_indices = [i for i, sim in enumerate(similarity) if sim > threshold]
+    return df_fork.iloc[relevant_indices]
+
 conversational_responses = {
     "привет": "Привет! Чем могу помочь?",
     "как дела": "У меня все отлично, спасибо! А у вас?",
@@ -178,7 +191,7 @@ conversational_responses = {
 
 def load_initial_questions():
     try:
-        df = pd.read_excel(os.path.join(Config.DATA_DIR, 'развилка.xlsx'))
+        df = pd.read_excel(Config.CROSSROAD_FILE)
         questions = df['Вопрос'].tolist()[:5]
         return questions
     except Exception as e:
@@ -244,12 +257,18 @@ def chat():
         query_history.append({'time': query_time, 'question': user_question, 'success': True})
         
         links = find_relevant_links(user_question_lower)
-        formatted_links = [{'question': row['Текст_вопроса'], 'url': row['Ссылка']} for _, row in links.iterrows() if row['Ссылка']]
+        fork_links = find_relevant_fork_links(user_question_lower)
         
-        return jsonify({'answer': answer, 'feedback': True, 'links': formatted_links, 'matched_question': matched_question})
+        formatted_links = [{'question': row['Текст_вопроса'], 'url': row['Ссылка'], 'type': 'link'} for _, row in links.iterrows() if row['Ссылка']]
+        formatted_fork_links = [{'question': row['Вопрос'], 'url': None, 'type': 'fork'} for _, row in fork_links.iterrows()]
+        
+        all_links = formatted_fork_links + formatted_links
+        
+        return jsonify({'answer': answer, 'feedback': True, 'links': all_links, 'matched_question': matched_question})
     except Exception as e:
         logging.error(f"Ошибка в /chat: {e}")
         return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
+    
 
 @app.route('/feedback', methods=['POST'])
 def feedback():

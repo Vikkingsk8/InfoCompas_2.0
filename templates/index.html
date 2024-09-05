@@ -13,6 +13,8 @@
         <img src="{{ url_for('static', filename='image.png') }}" alt="Логотип ЦБ РФ" class="logo">
     </div>
     <div class="chat-container">  
+        <div id="chat-messages"></div>
+        <div id="buttons-container"></div>
         <div class="instruction-tile" id="instruction-tile">
             <a href="https://www.cbr.ru/Content/Document/File/85699/instruction.pdf" target="_blank">
                 <img src="{{ url_for('static', filename='instruction.png') }}" alt="Инструкция" class="instruction-image">
@@ -122,42 +124,46 @@
             toggleInstructionButton.textContent = instructionTile.style.display === 'none' ? 'Показать руководство' : 'Скрыть руководство';
         });
 
-        async function sendMessage() {
-            const userMessage = inputField.value.trim();
+        async function sendMessage(message = null) {
+            console.log("sendMessage вызвана");
+            const userMessage = message || inputField.value.trim();
             if (userMessage !== '') {
                 lastQuestion = userMessage;
                 prependMessage(userMessage, 'user-message', '{{ url_for('static', filename='user_icon.png') }}');
                 inputField.value = '';
                 suggestionBox.innerHTML = '';
-
+        
                 const loadingMessage = prependMessage('Генерация ответа...', 'loading-message');
-
+        
                 try {
                     const response = await fetch('/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ question: userMessage, previous_answers: previousAnswers })
                     });
-
+        
                     const data = await response.json();
                     loadingMessage.remove();
-
+        
                     const messageElement = prependMessage(data.answer, 'bot-message', '{{ url_for('static', filename='bot_icon.png') }}', data.images, data.pdf_page);
-
+        
                     clearLinksContainer();
-
+        
                     if (data.links && data.links.length > 0) {
                         const newLinksContainer = createLinksContainer(data.links);
                         chatBox.insertBefore(newLinksContainer, chatBox.firstChild);
-                        setTimeout(scrollToBottom, 100);
                     }
-
+        
+                    clearButtonsContainer();
+        
                     if (data.feedback && !isGreeting(userMessage)) {
                         previousAnswers.push(data.answer);
                         addFeedbackButtons(messageElement, userMessage, data.answer);
                     } else {
                         previousAnswers = [];
                     }
+        
+                    setTimeout(scrollToBottom, 100);
                 } catch (error) {
                     console.error("Error sending message:", error);
                     loadingMessage.remove();
@@ -165,48 +171,68 @@
                 }
             }
         }
+        
+        function displayButtons(buttons) {
+            const buttonsContainer = document.getElementById('buttons-container');
+            buttonsContainer.innerHTML = '';
+            buttons.forEach(button => {
+                const link = document.createElement('button');
+                link.textContent = button.question;
+                link.classList.add('chat-button');
+                link.addEventListener('click', () => sendMessage(button.question));
+                buttonsContainer.appendChild(link);
+            });
+        }
+        
+        function clearButtonsContainer() {
+            const buttonsContainer = document.getElementById('buttons-container');
+            buttonsContainer.innerHTML = '';
+        }
+        
+        // Добавьте эти строки после объявления функции sendMessage
+        sendButton.addEventListener('click', () => sendMessage());
+        inputField.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') sendMessage();
+        });
 
         function createLinkButton(link) {
-            const linkButton = document.createElement('a');
-            linkButton.href = '#';
-            linkButton.textContent = link.question.replace('?', '').trim();
-            linkButton.target = '_blank';
-            linkButton.classList.add('link-button', 'fade-in');
+            const button = document.createElement('button');
+            button.textContent = link.question.replace('?', '').trim();
+            
+            if (link.type === 'fork') {
+                button.classList.add('fork-button');
+                console.log('Создана fork-кнопка:', link.question);
+            } else {
+                button.classList.add('link-button');
+                console.log('Создана link-кнопка:', link.question);
+            }
         
-            const handleClick = async (event) => {
+            button.addEventListener('click', async (event) => {
                 event.preventDefault();
-                console.log('Button clicked');
+                console.log('Кнопка нажата:', link.type, link.question);
         
-                // Отправка вопроса на сервер
-                await sendLinkQuestion(link.question, link.url);
+                if (link.type === 'fork') {
+                    await sendMessage(link.question);
+                } else {
+                    await sendLinkQuestion(link.question, link.url);
+                    if (link.url) {
+                        window.open(link.url, '_blank');
+                    }
+                }
+            });
         
-                // Открытие ссылки в новой вкладке через форму
-                const form = document.createElement('form');
-                form.method = 'GET';
-                form.action = link.url;
-                form.target = '_blank';
-                document.body.appendChild(form);
-                form.submit();
-                document.body.removeChild(form);
-        
-                // Удаление обработчика события после выполнения
-                linkButton.removeEventListener('click', handleClick);
-            };
-        
-            linkButton.addEventListener('click', handleClick, { once: true });
-        
-            return linkButton;
+            return button;
         }
 
         function createLinksContainer(links) {
             const newLinksContainer = document.createElement('div');
             newLinksContainer.classList.add('links-container', 'fade-in');
-
+        
             const visibleLinks = links.slice(0, 5);
             const hiddenLinks = links.slice(5);
-
+        
             visibleLinks.forEach(link => newLinksContainer.appendChild(createLinkButton(link)));
-
+        
             if (hiddenLinks.length > 0) {
                 const showMoreContainer = document.createElement('div');
                 showMoreContainer.classList.add('show-more-container', 'fade-in');
@@ -217,7 +243,7 @@
                 });
                 newLinksContainer.appendChild(showMoreContainer);
             }
-
+        
             return newLinksContainer;
         }
 
