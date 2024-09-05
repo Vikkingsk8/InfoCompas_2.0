@@ -260,9 +260,14 @@ def chat():
         fork_links = find_relevant_fork_links(user_question_lower)
         
         formatted_links = [{'question': row['Текст_вопроса'], 'url': row['Ссылка'], 'type': 'link'} for _, row in links.iterrows() if row['Ссылка']]
-        formatted_fork_links = [{'question': row['Вопрос'], 'url': None, 'type': 'fork'} for _, row in fork_links.iterrows()]
+        formatted_fork_links = [{'question': row['Вопрос'], 'url': None, 'type': 'fork'} for _, row in fork_links.iloc[5:].iterrows() if row['Вопрос'].lower() != user_question_lower]
         
-        all_links = formatted_fork_links + formatted_links
+        all_links = []
+        seen_questions = set()
+        for link in formatted_fork_links + formatted_links:
+            if link['question'] not in seen_questions:
+                all_links.append(link)
+                seen_questions.add(link['question'])
         
         return jsonify({'answer': answer, 'feedback': True, 'links': all_links, 'matched_question': matched_question})
     except Exception as e:
