@@ -59,11 +59,20 @@ def load_excel_data(path):
 
 def preprocess_excel_data(df, column_name):
     df = df.assign(Текст_вопроса=df[column_name].str.split('?')).explode('Текст_вопроса')
-    df['Текст_вопроса'] = df['Текст_вопроса'].str.lower().str.strip().replace('ё', 'е')
+    df['Текст_вопроса'] = df['Текст_вопроса'].str.lower().str.strip().replace('ё', 'е').astype(str)
     return df
 
 def preprocess_user_question(question):
     return question.lower().strip().replace('ё', 'е')
+
+def get_embedding(text):
+    if not isinstance(text, str):
+        raise ValueError(f"text input must be of type `str`, got {type(text)}")
+    inputs = tokenizer(text, return_tensors='pt', truncation=True, padding=True, max_length=512)
+    with torch.no_grad():
+        outputs = model(**inputs)
+    return outputs.last_hidden_state.mean(dim=1).squeeze().numpy()
+
 
 df_answers = load_excel_data(Config.EXCEL_PATH)
 df_answers = preprocess_excel_data(df_answers, 'Текст вопроса')
@@ -75,7 +84,9 @@ df_fork = load_excel_data(Config.CROSSROAD_FILE)
 df_fork = preprocess_excel_data(df_fork, 'Вопрос')
 
 start_time = time.time()
-df_answers['embedding'] = df_answers['Текст_вопроса'].apply(lambda x: embeddings_cache.get(x) if x in embeddings_cache else get_embedding(x))
+df_answers['embedding'] = df_answers['Текст_вопроса'].apply(
+    lambda x: embeddings_cache.get(x) if x in embeddings_cache else get_embedding(x) if isinstance(x, str) else None
+)
 end_time = time.time()
 logging.info(f"Время получения эмбеддингов: {end_time - start_time} секунд")
 
@@ -113,7 +124,12 @@ def preprocess_text(text):
 
 # Предобработка и индексация вопросов из базы данных
 for idx, row in df_answers.iterrows():
-    questions = row['Текст вопроса'].split('?')
+    if isinstance(row['Текст вопроса'], str):
+        questions = row['Текст вопроса'].split('?')
+    else:
+        print(f"Предупреждение: 'Текст вопроса' не является строкой для индекса {idx}: {row['Текст вопроса']}")
+        questions = []
+
     for question in questions:
         preprocessed_question = preprocess_text(question)
         for word in preprocessed_question:
@@ -134,7 +150,13 @@ def check_question_validity(user_question):
     return False, None
 
 def find_best_answer(query, embedding_weight=0.7, levenshtein_weight=0.15, bm25_weight=0.15):
+    if not isinstance(query, str):
+        logging.warning(f"Получен неверный тип данных для query: {type(query)}. Преобразование в строку.")
+        query = str(query)
+    
     query_embedding = get_embedding(query)
+    
+    # Остальной код функции...
     
     # Расчет сходства эмбеддингов
     embedding_similarities = cosine_similarity([query_embedding], df_answers['embedding'].tolist())[0]
@@ -161,6 +183,8 @@ def find_best_answer(query, embedding_weight=0.7, levenshtein_weight=0.15, bm25_
         return df_answers.iloc[best_match_index]['Текст ответа'], df_answers.iloc[best_match_index]['Текст_вопроса']
     else:
         return None, None
+    
+
 
 def find_relevant_links(user_question, threshold=0.3):
     user_question = preprocess_user_question(user_question)
@@ -261,15 +285,9 @@ def chat():
         
         formatted_links = [{'question': row['Текст_вопроса'], 'url': row['Ссылка'], 'type': 'link'} for _, row in links.iterrows() if row['Ссылка']]
         
-        # Создаем множество для отслеживания уникальных вопросов
-        unique_questions = set()
-        formatted_fork_links = []
-        
-        for _, row in fork_links.iterrows():
-            question = row['Вопрос']
-            if question not in unique_questions:
-                unique_questions.add(question)
-                formatted_fork_links.append({'question': question, 'url': None, 'type': 'fork'})
+        # Изменение здесь: используем множество для удаления дубликатов
+        unique_fork_questions = set(row['Вопрос'] for _, row in fork_links.iterrows())
+        formatted_fork_links = [{'question': q, 'url': None, 'type': 'fork'} for q in unique_fork_questions]
         
         all_links = formatted_fork_links + formatted_links
         
