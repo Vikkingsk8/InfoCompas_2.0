@@ -1,3 +1,5 @@
+#разработчик Ермилов В.В.
+#аналитик Файбисович В.А.
 from flask import Flask, request, jsonify, render_template, send_file, session
 import pandas as pd
 from transformers import AutoTokenizer, AutoModel

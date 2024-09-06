@@ -255,25 +255,36 @@
                 button.classList.add('link-button');
             }
         
-            button.addEventListener('click', async (event) => {
+            button.addEventListener('click', function(event) {
                 event.preventDefault();
-        
-                if (link.type === 'fork') {
-                    await sendMessage(link.question);
-                } else {
-                    if (!isNaN(link.url) && link.url.trim() !== '') {
-                        // Если URL - это число (номер страницы)
-                        openPdfAndGoToPage(parseInt(link.url));
-                    } else {
-                        await sendLinkQuestion(link.question, link.url);
-                        if (link.url) {
-                            window.open(link.url, '_blank');
-                        }
-                    }
-                }
+                event.stopPropagation();
+                handleLinkButtonClick(link);
             });
         
             return button;
+        }
+        
+        async function handleLinkButtonClick(link) {
+            if (link.type === 'fork') {
+                await sendMessage(link.question);
+            } else {
+                if (isValidPageNumber(link.url)) {
+                    // Если URL - это число (номер страницы)
+                    openPdfAndGoToPage(parseInt(link.url));
+                } else {
+                    await sendLinkQuestion(link.question, link.url);
+                    if (link.url) {
+                        window.open(link.url, '_blank');
+                    }
+                }
+            }
+        }
+        
+        function isValidPageNumber(value) {
+            // Удаляем пробелы в начале и конце строки
+            value = value.toString().trim();
+            // Проверяем, что строка состоит только из цифр
+            return /^\d+$/.test(value);
         }
 
         function createLinksContainer(links) {
@@ -439,15 +450,15 @@
             pdfContainer.style.display = 'block';
             mainContainer.classList.add('split');
         
-            // Обновляем src PDF viewer'а с указанием нужной страницы
-            pdfViewer.src = `/download_pdf#page=${pageNumber}`;
+            // Обновляем src PDF viewer'а с указанием нужной страницы и временной метки
+            const timestamp = new Date().getTime();
+            pdfViewer.src = `/download_pdf?t=${timestamp}#page=${pageNumber}`;
         
-            // Добавляем небольшую задержку, чтобы убедиться, что PDF загрузился
-            setTimeout(() => {
-                if (pdfViewer.contentWindow) {
-                    pdfViewer.contentWindow.scrollTo(0, 0);
-                }
-            }, 500);
+            // Добавляем обработчик события load для iframe
+            pdfViewer.onload = function() {
+                // Используем postMessage для перехода на нужную страницу
+                pdfViewer.contentWindow.postMessage({action: 'scrollToPage', page: pageNumber}, '*');
+            };
         
             // Анимация появления PDF контейнера
             pdfContainer.style.opacity = '0';
@@ -455,6 +466,18 @@
                 pdfContainer.style.opacity = '1';
             }, 50);
         }
+        
+        // Добавьте этот обработчик сообщений где-нибудь в вашем основном скрипте
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.action === 'scrollToPage') {
+                const pdfViewer = document.getElementById('pdf-viewer');
+                if (pdfViewer && pdfViewer.contentWindow) {
+                    pdfViewer.contentWindow.scrollTo(0, 0);
+                    // Здесь можно добавить дополнительную логику для прокрутки к нужной странице,
+                    // если PDF-viewer поддерживает такую функциональность
+                }
+            }
+        });
 
         function isGreeting(userMessage) {
             const greetings = ["привет", "здравствуй", "добрый день", "как дела", "погода", "возможности", "ты кто"];
