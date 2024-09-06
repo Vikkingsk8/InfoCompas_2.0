@@ -135,7 +135,6 @@
             });
         });
 
-
         document.addEventListener('DOMContentLoaded', function() {
             var url = '/static/instruction.pdf';
             var pdfjsLib = window['pdfjs-dist/build/pdf'];
@@ -252,22 +251,24 @@
             
             if (link.type === 'fork') {
                 button.classList.add('fork-button');
-                console.log('Создана fork-кнопка:', link.question);
             } else {
                 button.classList.add('link-button');
-                console.log('Создана link-кнопка:', link.question);
             }
         
             button.addEventListener('click', async (event) => {
                 event.preventDefault();
-                console.log('Кнопка нажата:', link.type, link.question);
         
                 if (link.type === 'fork') {
                     await sendMessage(link.question);
                 } else {
-                    await sendLinkQuestion(link.question, link.url);
-                    if (link.url) {
-                        window.open(link.url, '_blank');
+                    if (!isNaN(link.url) && link.url.trim() !== '') {
+                        // Если URL - это число (номер страницы)
+                        openPdfAndGoToPage(parseInt(link.url));
+                    } else {
+                        await sendLinkQuestion(link.question, link.url);
+                        if (link.url) {
+                            window.open(link.url, '_blank');
+                        }
                     }
                 }
             });
@@ -391,33 +392,68 @@
 
         function prependMessage(message, className, icon, images = [], pdfPage = null) {
             message = message.replace(/_x000D_/g, '');
-
+        
             const messageElement = document.createElement('div');
             messageElement.classList.add('message', className);
             messageElement.setAttribute('data-feedback-sent', 'false');
-
+        
             if (icon) {
                 const iconElement = document.createElement('img');
                 iconElement.src = icon;
                 messageElement.appendChild(iconElement);
             }
-
+        
             const messageContent = document.createElement('div');
             messageContent.innerHTML = message;
             messageElement.appendChild(messageContent);
-
+        
             if (pdfPage) {
                 const pageLink = document.createElement('a');
-                pageLink.href = `{{ url_for('download_pdf') }}#page=${pdfPage}`;
+                pageLink.href = '#';
                 pageLink.textContent = `Страница ${pdfPage}`;
-                pageLink.target = '_blank';
+                pageLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    openPdfAndGoToPage(pdfPage);
+                });
                 messageElement.appendChild(pageLink);
             }
-
+        
             chatBox.insertBefore(messageElement, chatBox.firstChild);
             setTimeout(() => messageElement.classList.add('fade-in', 'slide-in'), 100);
             setTimeout(scrollToBottom, 100);
             return messageElement;
+        }
+        
+        function openPdfAndGoToPage(pageNumber) {
+            const pdfContainer = document.getElementById('pdf-container');
+            const mainContainer = document.querySelector('.main-container');
+            const toggleInstructionButton = document.getElementById('toggle-instruction');
+            const pdfViewer = document.getElementById('pdf-viewer');
+        
+            // Показываем PDF контейнер, если он скрыт
+            if (pdfContainer.style.display === 'none') {
+                toggleInstructionButton.click();
+            }
+        
+            // Убедимся, что PDF контейнер отображается
+            pdfContainer.style.display = 'block';
+            mainContainer.classList.add('split');
+        
+            // Обновляем src PDF viewer'а с указанием нужной страницы
+            pdfViewer.src = `/download_pdf#page=${pageNumber}`;
+        
+            // Добавляем небольшую задержку, чтобы убедиться, что PDF загрузился
+            setTimeout(() => {
+                if (pdfViewer.contentWindow) {
+                    pdfViewer.contentWindow.scrollTo(0, 0);
+                }
+            }, 500);
+        
+            // Анимация появления PDF контейнера
+            pdfContainer.style.opacity = '0';
+            setTimeout(() => {
+                pdfContainer.style.opacity = '1';
+            }, 50);
         }
 
         function isGreeting(userMessage) {
