@@ -12,23 +12,22 @@
     <div class="header">
         <img src="{{ url_for('static', filename='image.png') }}" alt="Логотип ЦБ РФ" class="logo">
     </div>
-    <div class="chat-container">  
-        <div id="chat-messages"></div>
-        <div id="buttons-container"></div>
-        <div class="instruction-tile" id="instruction-tile">
-            <a href="https://www.cbr.ru/Content/Document/File/85699/instruction.pdf" target="_blank">
-                <img src="{{ url_for('static', filename='instruction.png') }}" alt="Инструкция" class="instruction-image">
-                <span>Руководство пользователя</span>
-            </a>
+    <div class="main-container">
+        <div id="pdf-container" style="display: none;">
+            <iframe id="pdf-viewer" src="/static/instruction.pdf"></iframe>
         </div>
-        <div class="chat-box" id="chat-box">
-            <!-- Здесь будет отображаться диалог -->
-        </div>
-        <div class="input-container">
-            <div id="suggestion-box" class="suggestion-box"></div>
-            <input type="text" class="input-field" id="input-field" placeholder="Введите ваш запрос...">
-            <button class="send-button" id="send-button">Отправить</button>
-            <button id="toggle-instruction" class="toggle-button">Показать руководство</button>
+        <div class="chat-container">  
+            <div id="chat-messages"></div>
+            <div id="buttons-container"></div>
+            <div class="chat-box" id="chat-box">
+                <!-- Здесь будет отображаться диалог -->
+            </div>
+            <div class="input-container">
+                <div id="suggestion-box" class="suggestion-box"></div>
+                <input type="text" class="input-field" id="input-field" placeholder="Введите ваш запрос...">
+                <button class="send-button" id="send-button">Отправить</button>
+                <button id="toggle-instruction" class="toggle-button">Показать руководство</button>
+            </div>
         </div>
     </div>
     <div class="footer">
@@ -119,9 +118,61 @@
             if (event.key === 'Enter') sendMessage();
         });
 
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleInstructionButton = document.getElementById('toggle-instruction');
+            const pdfContainer = document.getElementById('pdf-container');
+            const mainContainer = document.querySelector('.main-container');
+        
+            toggleInstructionButton.addEventListener('click', () => {
+                pdfContainer.classList.toggle('visible');
+                mainContainer.classList.toggle('split');
+                
+                if (pdfContainer.classList.contains('visible')) {
+                    toggleInstructionButton.textContent = 'Скрыть руководство';
+                } else {
+                    toggleInstructionButton.textContent = 'Показать руководство';
+                }
+            });
+        });
+
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var url = '/static/instruction.pdf';
+            var pdfjsLib = window['pdfjs-dist/build/pdf'];
+        
+            pdfjsLib.getDocument(url).promise.then(function(pdf) {
+                pdf.getPage(1).then(function(page) {
+                    var scale = 1.5;
+                    var viewport = page.getViewport({scale: scale});
+        
+                    var canvas = document.createElement('canvas');
+                    document.body.appendChild(canvas);
+                    var context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+        
+                    var renderContext = {
+                        canvasContext: context,
+                        viewport: viewport
+                    };
+                    page.render(renderContext);
+                });
+            });
+        });
+
         toggleInstructionButton.addEventListener('click', () => {
-            instructionTile.style.display = instructionTile.style.display === 'none' || instructionTile.style.display === '' ? 'flex' : 'none';
-            toggleInstructionButton.textContent = instructionTile.style.display === 'none' ? 'Показать руководство' : 'Скрыть руководство';
+            const pdfContainer = document.getElementById('pdf-container');
+            const mainContainer = document.querySelector('.main-container');
+            
+            if (pdfContainer.style.display === 'none') {
+                pdfContainer.style.display = 'block';
+                mainContainer.classList.add('split');
+                toggleInstructionButton.textContent = 'Скрыть руководство';
+            } else {
+                pdfContainer.style.display = 'none';
+                mainContainer.classList.remove('split');
+                toggleInstructionButton.textContent = 'Показать руководство';
+            }
         });
 
         async function sendMessage(message = null) {

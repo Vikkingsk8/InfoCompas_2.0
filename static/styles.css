@@ -29,7 +29,6 @@ body {
     position: fixed;
     bottom: 0;
     width: 100%;
-    z-index: 1001;
 }
 
 .footer .contact-info,
@@ -53,51 +52,52 @@ body {
     flex: 1;
     padding: 20px;
     position: relative;
+
 }
 
-.instruction-tile {
-    position: absolute;
-    left: 20px;
-    top: 50%;
-    transform: translateY(-50%);
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    background-color: #ffffff;
-    padding: 10px;
-    border-radius: 10px;
-}
-
-.instruction-tile a {
-    text-decoration: none;
-    color: #007BFF;
-    font-weight: bold;
+.main-container {
+    flex: 1 0 auto;
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    font-size: 12px;
+    overflow: hidden;
+    padding-bottom: 75px;
 }
 
-.instruction-image {
-    width: 200px;
-    margin-bottom: 10px;
+
+#pdf-container {
+    flex: 0 0 50%; /* Занимает 50% высоты при отображении */
+    width: 100%;
+    display: none; /* Изначально скрыт */
+    overflow: hidden; /* Скрываем возможные полосы прокрутки */
+    animation: fadeIn 0.5s ease-in forwards;
 }
+
+#pdf-viewer {
+    width: 100%;
+    height: 100%;
+    border: none; /* Убираем рамку у iframe */
+    margin: 0;
+    transform: scale(1);
+    transform-origin: top right;
+    animation: fadeIn 0.5s ease-in forwards;
+}
+
+
 
 .input-container {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 10px;
-    width: 100%;
+    width: 95%;
     max-width: 800px;
-    margin-top: 20px;
-    position: fixed;
-    bottom: 100px;
+    margin-top: 20px auto;
+    bottom: 10px;
     left: 50%;
     transform: translateX(-50%);
     background-color: transparent;
     border-radius: 5px;
+    position: absolute;
+    
 }
 
 .toggle-button {
@@ -110,6 +110,7 @@ body {
     border-radius: 5px;
     cursor: pointer;
     animation: rotateGradient 5s ease infinite; /* Добавляем анимацию */
+    display: block !important;
 }
 
 .toggle-button:hover {
@@ -157,7 +158,7 @@ body {
     height: 100%;
     max-height: calc(100vh - 220px);
     background-color: transparent;
-    border-radius: 10px;
+    border-radius: 10px 10px 0 0;
     padding: 20px;
     overflow-y: auto;
     box-sizing: border-box;
@@ -167,7 +168,7 @@ body {
     scrollbar-color: #888 transparent;
     margin-bottom: 20px;
     position: absolute;
-    top: 0;
+    bottom: 55px;
 }
 
 .chat-box::-webkit-scrollbar {
@@ -475,22 +476,15 @@ body {
 }
 
 /* Медиа-запросы для адаптивности под смартфоны */
-@media (max-width: 600px) {
+@media (max-width: 1200px) {
     .header {
         height: 40px;
     }
 
     .footer {
-        font-size: 10px;
-        padding: 5px 0;
+        display: none !important;
     }
 
-    .footer .contact-info,
-    .footer .copyright,
-    .footer .email {
-        font-size: 10px;
-        margin-bottom: 3px;
-    }
 
     .logo {
         height: 25px;
@@ -498,17 +492,23 @@ body {
     }
 
     .chat-container {
-        padding: 10px;
-        overflow-x: hidden !important; /* Скрываем горизонтальный скролл */
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
     }
 
-    .instruction-tile {
-        display: none !important; /* Скрываем кнопку "Руководство пользователя" на мобильных устройствах */
+    .main-container {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
     }
+    
+    
 
     .input-container {
         padding: 5px;
-        bottom: 60px;
+        bottom: 5px;
         width: calc(100% - 20px); /* Убираем горизонтальный скролл */
         
     }
@@ -593,21 +593,4 @@ body {
         display: none !important;
     }
 }
-    /* Дополнительный медиа-запрос для горизонтального режима */
-    @media (max-height: 600px) and (orientation: landscape) {
-        .toggle-button {
-            display: none !important;
-        }
-
-        .feedback-button {
-            display: none !important;
-        }
-
-        .user-message,
-        .bot-message {
-        max-width: 80% !important; /* Уменьшаем максимальную ширину сообщений в горизонтальном режиме */
-        word-wrap: break-word !important; /* Перенос слов для предотвращения выхода за пределы контейнера */
-        overflow-wrap: break-word !important; /* Дополнительный перенос слов */
-        white-space: normal !important; /* Убедитесь, что текст всегда переносится на новую строку */
-    }
-    }
+/* Стили для блокировки горизонтальной ориентации */
