@@ -13,8 +13,6 @@ import os
 import logging
 import time
 import re
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
 from collections import defaultdict, Counter
 import datetime
 import requests

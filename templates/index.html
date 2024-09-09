@@ -14,7 +14,7 @@
     </div>
     <div class="main-container">
         <div id="pdf-container" style="display: none;">
-            <iframe id="pdf-viewer" src="/static/instruction.pdf"></iframe>
+            <iframe id="pdf-viewer" src="https://www.cbr.ru/Content/Document/File/85699/instruction.pdf"></iframe>
         </div>
         <div class="chat-container">  
             <div id="chat-messages"></div>
@@ -136,7 +136,7 @@
         });
 
         document.addEventListener('DOMContentLoaded', function() {
-            var url = '/static/instruction.pdf';
+            var url = 'https://www.cbr.ru/Content/Document/File/85699/instruction.pdf';
             var pdfjsLib = window['pdfjs-dist/build/pdf'];
         
             pdfjsLib.getDocument(url).promise.then(function(pdf) {
@@ -452,7 +452,7 @@
         
             // Обновляем src PDF viewer'а с указанием нужной страницы и временной метки
             const timestamp = new Date().getTime();
-            pdfViewer.src = `/download_pdf?t=${timestamp}#page=${pageNumber}`;
+            pdfViewer.src = `https://www.cbr.ru/Content/Document/File/85699/instruction.pdf#page=${pageNumber}`;
         
             // Добавляем обработчик события load для iframe
             pdfViewer.onload = function() {
