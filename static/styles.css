@@ -63,7 +63,7 @@ body {
 }
 
 
-#pdf-container {
+/* #pdf-container {
     flex: 0 0 50%;
     width: 100%;
     display: none;
@@ -73,7 +73,7 @@ body {
 
 #pdf-viewer {
     width: 100%;
-    height: calc(100% - 40px); /* Оставляем место для элементов управления */
+    height: calc(100% - 40px); 
     border: none;
     margin: 0;
 }
@@ -110,7 +110,7 @@ body {
     padding: 5px;
     border-radius: 5px;
     border: 1px solid #ccc;
-}
+} */
 
 /* #pdf-container {
     flex: 0 0 50%; 
