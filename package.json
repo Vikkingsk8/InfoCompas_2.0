@@ -1,0 +1,15 @@
+{
+  "name": "infocompas_2.0",
+  "version": "1.0.0",
+  "description": "ИнфоКомпас — это виртуальный помощник, разработанный для помощи пользователям в поиске информации из различных источников, таких как Excel-таблицы и PDF-документы, с использованием методов NLP (Natural Language Processing) и TF-IDF (Term Frequency-Inverse Document Frequency) для анализа текста и поиска наиболее релевантных ответов. Проект располагается на облаке Cloud.ru и доступен по адресу [http://176.109.109.61:8080/](http://176.109.109.61:8080/).Дашборд проекта располагается по адресу: (http://176.109.109.61:8080/dashboard)",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "pdfjs-dist": "^4.6.82"
+  }
+}
