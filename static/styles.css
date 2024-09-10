@@ -112,7 +112,7 @@ body {
     border: 1px solid #ccc;
 } */
 
-/* #pdf-container {
+#pdf-container {
     flex: 0 0 50%; 
     width: 100%;
     display: none; 
@@ -128,7 +128,7 @@ body {
     transform: scale(1);
     transform-origin: top right;
     animation: fadeIn 0.5s ease-in forwards;
-} */
+}
 
 
 
