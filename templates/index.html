@@ -48,6 +48,12 @@
         const instructionTile = document.getElementById('instruction-tile');
         const toggleInstructionButton = document.getElementById('toggle-instruction');
 
+        const links = [
+            { type: 'fork', question: 'Fork Question 1' },
+            { type: 'pdf', question: 'PDF Question 1' },
+            { type: 'link', question: 'Link Question 1' },
+        ];
+
         let lastQuestion = '';
         let previousAnswers = [];
         let suggestions = [];
@@ -251,18 +257,21 @@
             
             if (link.type === 'fork') {
                 button.classList.add('fork-button');
+            } else if (isValidPageNumber(link.url)) {
+                button.classList.add('pdf-page-button'); // Добавляем класс для кнопок с номерами страниц
             } else {
                 button.classList.add('link-button');
             }
-        
+    
             button.addEventListener('click', function(event) {
                 event.preventDefault();
                 event.stopPropagation();
                 handleLinkButtonClick(link);
             });
-        
+    
             return button;
         }
+
         
         async function handleLinkButtonClick(link) {
             if (link.type === 'fork') {
@@ -291,8 +300,20 @@
             const newLinksContainer = document.createElement('div');
             newLinksContainer.classList.add('links-container', 'fade-in');
         
-            const visibleLinks = links.slice(0, 5);
-            const hiddenLinks = links.slice(5);
+            // Присваиваем числовые значения типам кнопок
+            const typeOrder = {
+                'fork': 1,
+                'pdf': 2,
+                'link': 3
+            };
+        
+            // Создаем копию массива перед сортировкой
+            const sortedLinks = [...links].sort((a, b) => {
+                return typeOrder[a.type] - typeOrder[b.type];
+            });
+        
+            const visibleLinks = sortedLinks.slice(0, 5);
+            const hiddenLinks = sortedLinks.slice(5);
         
             visibleLinks.forEach(link => newLinksContainer.appendChild(createLinkButton(link)));
         

@@ -63,19 +63,13 @@ body {
 }
 
 
+
 /* #pdf-container {
     flex: 0 0 50%;
     width: 100%;
     display: none;
     overflow: hidden;
     animation: fadeIn 0.5s ease-in forwards;
-}
-
-#pdf-viewer {
-    width: 100%;
-    height: calc(100% - 40px); 
-    border: none;
-    margin: 0;
 }
 
 #pdf-controls {
@@ -105,12 +99,18 @@ body {
     margin: 0 5px;
 }
 
-#zoom-select {
-    margin-left: 10px;
-    padding: 5px;
-    border-radius: 5px;
-    border: 1px solid #ccc;
+#pdf-viewer {
+    width: 100%;
+    height: calc(100% - 40px);
+    border: none;
+    margin: 0;
+    overflow: auto;
+    transform: scale(1);
+    transform-origin: top right;
+    animation: fadeIn 0.5s ease-in forwards;
 } */
+
+
 
 #pdf-container {
     flex: 0 0 50%; 
@@ -149,6 +149,31 @@ body {
     
 }
 
+
+.pdf-page-button {
+    display: inline-block;
+    margin: 5px;
+    padding: 5px 10px;
+    color: rgb(255, 255, 255);
+    text-decoration: none;
+    border-radius: 5px;
+    cursor: pointer;
+    border: none;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeIn 0.5s ease-in forwards; /* Объединяем анимации */
+    background: #0f32a8 !important; /* Изменено на background */
+    
+}
+
+.pdf-page-button:hover {
+    background: #050d55 !important;
+    
+}
+
+
+
+
 .toggle-button {
     margin: 0 10px;
     padding: 10px;
@@ -159,7 +184,6 @@ body {
     border-radius: 5px;
     cursor: pointer;
     animation: rotateGradient 5s ease infinite; /* Добавляем анимацию */
-    display: block !important;
 }
 
 .toggle-button:hover {
@@ -176,6 +200,13 @@ body {
     }
     100% {
         background-position: 0% 50%;
+    }
+}
+
+@keyframes fadeIn {
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
 }
 
