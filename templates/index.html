@@ -206,7 +206,7 @@
                     clearLinksContainer();
         
                     if (data.links && data.links.length > 0) {
-                        const newLinksContainer = createLinksContainer(data.links);
+                        const newLinksContainer = createLinksContainer(data.links, userMessage);
                         chatBox.insertBefore(newLinksContainer, chatBox.firstChild);
                     }
         
@@ -296,7 +296,7 @@
             return /^\d+$/.test(value);
         }
 
-        function createLinksContainer(links) {
+        function createLinksContainer(links, questionText) {
             const newLinksContainer = document.createElement('div');
             newLinksContainer.classList.add('links-container', 'fade-in');
         
@@ -315,14 +315,22 @@
             const visibleLinks = sortedLinks.slice(0, 5);
             const hiddenLinks = sortedLinks.slice(5);
         
-            visibleLinks.forEach(link => newLinksContainer.appendChild(createLinkButton(link)));
+            visibleLinks.forEach(link => {
+                if (link.question !== questionText) {
+                    newLinksContainer.appendChild(createLinkButton(link));
+                }
+            });
         
             if (hiddenLinks.length > 0) {
                 const showMoreContainer = document.createElement('div');
                 showMoreContainer.classList.add('show-more-container', 'fade-in');
                 showMoreContainer.textContent = `Показать больше (${hiddenLinks.length})`;
                 showMoreContainer.addEventListener('click', () => {
-                    hiddenLinks.forEach(link => newLinksContainer.appendChild(createLinkButton(link)));
+                    hiddenLinks.forEach(link => {
+                        if (link.question !== questionText) {
+                            newLinksContainer.appendChild(createLinkButton(link));
+                        }
+                    });
                     showMoreContainer.remove();
                 });
                 newLinksContainer.appendChild(showMoreContainer);
@@ -397,7 +405,7 @@
                     clearLinksContainer();
         
                     if (data.links && data.links.length > 0) {
-                        const newLinksContainer = createLinksContainer(data.links);
+                        const newLinksContainer = createLinksContainer(data.links, question);
                         chatBox.insertBefore(newLinksContainer, chatBox.firstChild);
                         setTimeout(scrollToBottom, 100);
                     } else {
@@ -477,62 +485,62 @@
         
             // Добавляем обработчик события load для iframe
             pdfViewer.onload = function() {
-                // Используем postMessage для перехода на нужную страницу
-                pdfViewer.contentWindow.postMessage({action: 'scrollToPage', page: pageNumber}, '*');
-            };
-        
-            // Анимация появления PDF контейнера
-            pdfContainer.style.opacity = '0';
-            setTimeout(() => {
-                pdfContainer.style.opacity = '1';
-            }, 50);
-        }
-        
-        // Добавьте этот обработчик сообщений где-нибудь в вашем основном скрипте
-        window.addEventListener('message', function(event) {
-            if (event.data && event.data.action === 'scrollToPage') {
-                const pdfViewer = document.getElementById('pdf-viewer');
-                if (pdfViewer && pdfViewer.contentWindow) {
-                    pdfViewer.contentWindow.scrollTo(0, 0);
-                    // Здесь можно добавить дополнительную логику для прокрутки к нужной странице,
-                    // если PDF-viewer поддерживает такую функциональность
+                    // Используем postMessage для перехода на нужную страницу
+                    pdfViewer.contentWindow.postMessage({action: 'scrollToPage', page: pageNumber}, '*');
+                };
+            
+                // Анимация появления PDF контейнера
+                pdfContainer.style.opacity = '0';
+                setTimeout(() => {
+                    pdfContainer.style.opacity = '1';
+                }, 50);
+            }
+            
+            // Добавьте этот обработчик сообщений где-нибудь в вашем основном скрипте
+            window.addEventListener('message', function(event) {
+                if (event.data && event.data.action === 'scrollToPage') {
+                    const pdfViewer = document.getElementById('pdf-viewer');
+                    if (pdfViewer && pdfViewer.contentWindow) {
+                        pdfViewer.contentWindow.scrollTo(0, 0);
+                        // Здесь можно добавить дополнительную логику для прокрутки к нужной странице,
+                        // если PDF-viewer поддерживает такую функциональность
+                    }
+                }
+            });
+    
+            function isGreeting(userMessage) {
+                const greetings = ["привет", "здравствуй", "добрый день", "как дела", "погода", "возможности", "ты кто"];
+                return greetings.some(greeting => userMessage.toLowerCase().includes(greeting));
+            }
+    
+            function scrollToBottom() {
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+    
+            async function sendFeedback(messageElement, feedbackType) {
+                if (messageElement.getAttribute('data-feedback-sent') === 'true') return;
+    
+                const feedback = { question: lastQuestion, answer: messageElement.textContent };
+                try {
+                    const response = await fetch(`/${feedbackType}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ question: feedback.question, answer: feedback.answer })
+                    });
+    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        console.error(`Error sending ${feedbackType} feedback:`, errorData);
+                    } else {
+                        console.log(`${feedbackType} feedback sent successfully`);
+                        messageElement.setAttribute('data-feedback-sent', 'true');
+                    }
+                } catch (error) {
+                    console.error(`Error sending ${feedbackType} feedback:`, error);
                 }
             }
-        });
-
-        function isGreeting(userMessage) {
-            const greetings = ["привет", "здравствуй", "добрый день", "как дела", "погода", "возможности", "ты кто"];
-            return greetings.some(greeting => userMessage.toLowerCase().includes(greeting));
-        }
-
-        function scrollToBottom() {
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        async function sendFeedback(messageElement, feedbackType) {
-            if (messageElement.getAttribute('data-feedback-sent') === 'true') return;
-
-            const feedback = { question: lastQuestion, answer: messageElement.textContent };
-            try {
-                const response = await fetch(`/${feedbackType}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ question: feedback.question, answer: feedback.answer })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    console.error(`Error sending ${feedbackType} feedback:`, errorData);
-                } else {
-                    console.log(`${feedbackType} feedback sent successfully`);
-                    messageElement.setAttribute('data-feedback-sent', 'true');
-                }
-            } catch (error) {
-                console.error(`Error sending ${feedbackType} feedback:`, error);
-            }
-        }
-
-        loadSuggestions();
+    
+            loadSuggestions();
     </script>
 </body>
 </html>
