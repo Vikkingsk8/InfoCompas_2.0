@@ -528,6 +528,18 @@
             }
     
             loadSuggestions();
+
+            // Добавляем проверку на мобильное устройство
+            function isMobileDevice() {
+                return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            }
+
+            // Блокируем скачивание PDF на мобильных устройствах
+            if (isMobileDevice()) {
+                const pdfContainer = document.getElementById('pdf-container');
+                pdfContainer.style.display = 'none';
+                toggleInstructionButton.style.display = 'none';
+            }
     </script>
 </body>
 </html>

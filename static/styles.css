@@ -672,5 +672,8 @@ body {
     .feedback-button {
         display: none !important;
     }
+    .pdf-page-button {
+        display: none;
+    }
 }
 /* Стили для блокировки горизонтальной ориентации */
