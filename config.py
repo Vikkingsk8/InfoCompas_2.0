@@ -10,3 +10,7 @@ class Config:
     PDF_PATH = os.getenv('PDF_PATH', os.path.join(DATA_DIR, 'instruction.pdf'))
     FEEDBACK_FILE = os.path.join(DATA_DIR, 'feedback.xlsx')
     CROSSROAD_FILE = os.path.join(DATA_DIR, 'развилка.xlsx')
+
+    CACHE_TYPE = 'filesystem'
+    CACHE_DIR = CACHE_DIR  # Директория для хранения кэша
+    CACHE_DEFAULT_TIMEOUT = 3600  # Время жизни кэша в секундах (1 час)
