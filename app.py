@@ -1,6 +1,5 @@
-#разработчик Ермилов В.В.
-#аналитик Файбисович В.А.
-from flask import Flask, request, jsonify, render_template, send_file, session
+from flask import Flask, request, jsonify, render_template, send_from_directory, session, send_file
+from flask_caching import Cache
 import pandas as pd
 from transformers import AutoTokenizer, AutoModel
 import torch
@@ -23,14 +22,20 @@ app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your_default_secret_key')
 dash_app = create_dash_app(app, routes_pathname_prefix='/dashboard/')
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Настройка кэширования
+cache = Cache(app, config={
+    'CACHE_TYPE': 'filesystem',  # Использовать файловую систему в качестве бэкенда
+    'CACHE_DIR': Config.CACHE_DIR,  # Путь к директории для хранения кэша
+    'CACHE_DEFAULT_TIMEOUT': 3600  # Время жизни кэша по умолчанию (1 час)
+})
 
 # Глобальные переменные для отслеживания метрик
 total_queries = 0
 successful_queries = 0
 query_history = []
 feedback_history = []
-
 
 tokenizer = AutoTokenizer.from_pretrained("cointegrated/rubert-tiny2")
 model = AutoModel.from_pretrained("cointegrated/rubert-tiny2")
@@ -72,7 +77,6 @@ def get_embedding(text):
     with torch.no_grad():
         outputs = model(**inputs)
     return outputs.last_hidden_state.mean(dim=1).squeeze().numpy()
-
 
 df_answers = load_excel_data(Config.EXCEL_PATH)
 df_answers = preprocess_excel_data(df_answers, 'Текст вопроса')
@@ -185,7 +189,6 @@ def find_best_answer(query, embedding_weight=0.7, levenshtein_weight=0.15, bm25_
         return None, None
     
 
-
 def find_relevant_links(user_question, threshold=0.3):
     user_question = preprocess_user_question(user_question)
     links_questions = df_links['Текст_вопроса'].tolist()
@@ -222,10 +225,17 @@ def load_initial_questions():
         logging.error(f"Ошибка при загрузке начальных вопросов: {e}")
         return []
 
-
 @app.route('/download_pdf')
 def download_pdf():
-    return send_file(Config.PDF_PATH, as_attachment=False)
+    pdf_path = cache.get('pdf_path')
+    if pdf_path is None or not os.path.exists(pdf_path):
+        pdf_path = Config.PDF_PATH
+        cache.set('pdf_path', pdf_path, timeout=3600)
+
+    if not os.path.exists(pdf_path):
+        return "File not found", 404
+
+    return send_file(pdf_path, as_attachment=False)
 
 @app.route('/load_suggestions', methods=['GET'])
 def load_suggestions():
@@ -233,9 +243,17 @@ def load_suggestions():
     suggestions = [s[0].upper() + s[1:] if s else s for s in suggestions]
     return jsonify({'suggestions': suggestions})
 
+@app.route('/log', methods=['POST'])
+def log():
+    data = request.json
+    message = data.get('message')
+    logging.debug(f"Client log: {message}")
+    return jsonify({'status': 'ok'}), 200
+
 @app.route('/')
 def index():
     initial_questions = load_initial_questions()
+    logging.debug("Rendering index.html with initial questions")
     return render_template('index.html', initial_questions=initial_questions)
 
 @app.route('/chat', methods=['POST'])
