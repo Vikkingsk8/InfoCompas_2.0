@@ -1,5 +1,6 @@
-from flask import Flask, request, jsonify, render_template, send_from_directory, session, send_file
+from flask import Flask, request, jsonify, render_template, session, send_file, make_response
 from flask_caching import Cache
+import tempfile
 import pandas as pd
 from transformers import AutoTokenizer, AutoModel
 import torch
@@ -17,19 +18,19 @@ import datetime
 import requests
 from dashboard import create_dash_app
 from config import Config
+import io
+
 
 app = Flask(__name__)
+app.config.from_object(Config)
 app.secret_key = os.getenv('SECRET_KEY', 'your_default_secret_key')
 dash_app = create_dash_app(app, routes_pathname_prefix='/dashboard/')
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Настройка кэширования
-cache = Cache(app, config={
-    'CACHE_TYPE': 'filesystem',  # Использовать файловую систему в качестве бэкенда
-    'CACHE_DIR': Config.CACHE_DIR,  # Путь к директории для хранения кэша
-    'CACHE_DEFAULT_TIMEOUT': 3600  # Время жизни кэша по умолчанию (1 час)
-})
+cache = Cache(app)
 
 # Глобальные переменные для отслеживания метрик
 total_queries = 0
@@ -227,15 +228,35 @@ def load_initial_questions():
 
 @app.route('/download_pdf')
 def download_pdf():
-    pdf_path = cache.get('pdf_path')
-    if pdf_path is None or not os.path.exists(pdf_path):
-        pdf_path = Config.PDF_PATH
-        cache.set('pdf_path', pdf_path, timeout=3600)
+    cached_pdf_path = cache.get('cached_pdf_path')
 
-    if not os.path.exists(pdf_path):
+    if cached_pdf_path is None or not os.path.exists(cached_pdf_path):
+        logger.info("Кэшированный файл не найден. Создаем новый временный файл.")
+        # Если кэшированный файл не существует, создаем новый временный файл в CACHE_DIR
+        cache_file_name = 'cached_instruction.pdf'
+        cached_pdf_path = os.path.join(Config.CACHE_DIR, cache_file_name)
+
+        # Проверяем, существует ли директория CACHE_DIR, и создаем её, если нет
+        if not os.path.exists(Config.CACHE_DIR):
+            os.makedirs(Config.CACHE_DIR)
+
+        # Копируем содержимое оригинального PDF в кэшированный файл
+        with open(Config.PDF_PATH, 'rb') as original_file, open(cached_pdf_path, 'wb') as cached_file:
+            original_content = original_file.read()
+            cached_file.write(original_content)
+            logger.info(f"Содержимое оригинального файла прочитано и записано в кэшированный файл. Размер: {len(original_content)} байт")
+
+        cache.set('cached_pdf_path', str(cached_pdf_path), timeout=3600)  # Кэшируем строку с путем к файлу
+        logger.info(f"Файл PDF успешно кэширован. Путь: {cached_pdf_path}")
+    else:
+        logger.info(f"Используем кэшированный файл. Путь: {cached_pdf_path}")
+
+    if not os.path.exists(cached_pdf_path):
+        logger.error("Кэшированный файл не найден.")
         return "File not found", 404
 
-    return send_file(pdf_path, as_attachment=False)
+    logger.info(f"Отправляем кэшированный файл. Путь: {cached_pdf_path}")
+    return send_file(cached_pdf_path, as_attachment=False)
 
 @app.route('/load_suggestions', methods=['GET'])
 def load_suggestions():

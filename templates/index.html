@@ -14,7 +14,7 @@
     </div>
     <div class="main-container">
         <div id="pdf-container" style="display: none;">
-            <iframe id="pdf-viewer" src="/static/instruction.pdf"></iframe>
+            <iframe id="pdf-viewer" src="/download_pdf"></iframe>
         </div>
         <div class="chat-container">  
             <div id="chat-messages"></div>
@@ -141,30 +141,6 @@
             });
         });
 
-        document.addEventListener('DOMContentLoaded', function() {
-            var url = '/static/instruction.pdf';
-            var pdfjsLib = window['pdfjs-dist/build/pdf'];
-        
-            pdfjsLib.getDocument(url).promise.then(function(pdf) {
-                pdf.getPage(1).then(function(page) {
-                    var scale = 1.5;
-                    var viewport = page.getViewport({scale: scale});
-        
-                    var canvas = document.createElement('canvas');
-                    document.body.appendChild(canvas);
-                    var context = canvas.getContext('2d');
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
-        
-                    var renderContext = {
-                        canvasContext: context,
-                        viewport: viewport
-                    };
-                    page.render(renderContext);
-                });
-            });
-        });
-
         toggleInstructionButton.addEventListener('click', () => {
             const pdfContainer = document.getElementById('pdf-container');
             const mainContainer = document.querySelector('.main-container');
@@ -266,6 +242,7 @@
             button.addEventListener('click', function(event) {
                 event.preventDefault();
                 event.stopPropagation();
+                console.log(`Нажата кнопка pdf-page-button для страницы ${link.url}`);
                 handleLinkButtonClick(link);
             });
     
@@ -278,6 +255,7 @@
                 await sendMessage(link.question);
             } else {
                 if (isValidPageNumber(link.url)) {
+                    console.log(`Нажата кнопка pdf-page-button для страницы ${link.url}`);
                     // Если URL - это число (номер страницы)
                     openPdfAndGoToPage(parseInt(link.url));
                 } else {
@@ -465,6 +443,7 @@
         }
         
         function openPdfAndGoToPage(pageNumber) {
+            console.log(`Переход к странице ${pageNumber}`);
             const pdfContainer = document.getElementById('pdf-container');
             const mainContainer = document.querySelector('.main-container');
             const toggleInstructionButton = document.getElementById('toggle-instruction');
@@ -479,22 +458,30 @@
             pdfContainer.style.display = 'block';
             mainContainer.classList.add('split');
         
-            // Обновляем src PDF viewer'а с указанием нужной страницы и временной метки
-            const timestamp = new Date().getTime();
-            pdfViewer.src = `/download_pdf?t=${timestamp}#page=${pageNumber}`;
-        
-            // Добавляем обработчик события load для iframe
-            pdfViewer.onload = function() {
-                    // Используем postMessage для перехода на нужную страницу
-                    pdfViewer.contentWindow.postMessage({action: 'scrollToPage', page: pageNumber}, '*');
-                };
-            
-                // Анимация появления PDF контейнера
-                pdfContainer.style.opacity = '0';
-                setTimeout(() => {
-                    pdfContainer.style.opacity = '1';
-                }, 50);
+            // Удаляем старый iframe
+            if (pdfViewer) {
+                pdfViewer.remove();
             }
+        
+            // Создаем новый iframe
+            const newPdfViewer = document.createElement('iframe');
+            newPdfViewer.id = 'pdf-viewer';
+            newPdfViewer.src = `/download_pdf?#page=${pageNumber}`;
+            pdfContainer.appendChild(newPdfViewer);
+        
+            // Добавляем обработчик события load для нового iframe
+            newPdfViewer.onload = function() {
+                console.log(`Iframe загружен, переход к странице ${pageNumber}`);
+                // Используем postMessage для перехода на нужную страницу
+                newPdfViewer.contentWindow.postMessage({action: 'scrollToPage', page: pageNumber}, '*');
+            };
+        
+            // Анимация появления PDF контейнера
+            pdfContainer.style.opacity = '0';
+            setTimeout(() => {
+                pdfContainer.style.opacity = '1';
+            }, 50);
+        }
             
             // Добавьте этот обработчик сообщений где-нибудь в вашем основном скрипте
             window.addEventListener('message', function(event) {
