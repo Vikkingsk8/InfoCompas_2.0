@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ИнфоКомпас</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+    <link rel="icon" href="{{ url_for('static', filename='icon.png') }}">
+</head>
+<body>
+    <div class="header">
+        <img src="{{ url_for('static', filename='image.png') }}" alt="Логотип ЦБ РФ" class="logo">
+    </div>
+    <div class="main-container">
+        <div id="pdf-container" class='hidden'>
+            <div class="pdf-toolbar">
+                <div class="burger-menu" id="burger-menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+                <span>Страница:</span>
+                <input type="number" id="page-number" min="1" max="700" value="1" class="page-number">
+                <span>/</span>
+                <span id="total-pages">700</span>
+                <button id="prev-page" class="page-button">&#9650;</button>
+                <button id="next-page" class="page-button">&#9660;</button>
+                <div class="zoom-controls">
+                    <button id="zoom-in">+</button>
+                    <button id="zoom-out">-</button>
+                </div>
+            </div>
+            <div id="pdf-pages"></div>
+            <div class="loading-indicator">Загрузка...</div>
+        </div>
+        <div class="chat-container">  
+            <div id="chat-messages"></div>
+            <div id="buttons-container"></div>
+            <div class="chat-box" id="chat-box">
+                <!-- Здесь будет отображаться диалог -->
+            </div>
+            <div class="input-container">
+                <div id="suggestion-box" class="suggestion-box"></div>
+                <input type="text" class="input-field" id="input-field" placeholder="Введите ваш запрос...">
+                <button class="send-button" id="send-button">Отправить</button>
+                <button id="toggle-instruction" class="toggle-button">Показать руководство</button>
+            </div>
+        </div>
+    </div>
+    <div class="footer">
+        <div class="contact-info">
+            <div>Управление развития электронного взаимодействия</div>
+        </div>    
+        <div class="email">
+            <div>lk_uio@cbr.ru</div>
+        </div>
+        <div class="copyright">© 2024 Внешний портал Банка России 2000 - 2024</div>
+    </div>
+
+    <div class="toc-panel" id="toc-panel">
+        <ul id="toc-list"></ul>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const inputField = document.getElementById('input-field');
+        const sendButton = document.getElementById('send-button');
+        const suggestionBox = document.getElementById('suggestion-box');
+        const toggleInstructionButton = document.getElementById('toggle-instruction');
+        const pdfContainer = document.getElementById('pdf-container');
+        const pdfPagesContainer = document.getElementById('pdf-pages');
+        const pageNumberInput = document.getElementById('page-number');
+        const totalPagesSpan = document.getElementById('total-pages');
+        const burgerMenu = document.getElementById('burger-menu');
+        const tocPanel = document.getElementById('toc-panel');
+        const tocList = document.getElementById('toc-list');
+        const loadingIndicator = document.querySelector('.loading-indicator');
+        const prevPageButton = document.getElementById('prev-page');
+        const nextPageButton = document.getElementById('next-page');
+        const zoomInButton = document.getElementById('zoom-in');
+        const zoomOutButton = document.getElementById('zoom-out');
+
+        const links = [
+            { type: 'fork', question: 'Fork Question 1' },
+            { type: 'pdf', question: 'PDF Question 1' },
+            { type: 'link', question: 'Link Question 1' },
+        ];
+
+        let lastQuestion = '';
+        let previousAnswers = [];
+        let suggestions = [];
+        let pdfDoc = null;
+        let currentPage = 1;
+        let scale = 1.5;
+        const pagesToRender = 5;
+        let viewport;
+
+        // Приветствие при запуске
+        function showWelcomeMessage() {
+            const welcomeMessage = "Привет! Я ИнфоКомпас, ваш виртуальный помощник. Чем могу помочь?";
+            prependMessage(welcomeMessage, 'bot-message', '{{ url_for('static', filename='bot_icon.png') }}');
+            
+            // Создаем контейнер для кнопок с начальными вопросами
+            const buttonsContainer = document.createElement('div');
+            buttonsContainer.classList.add('initial-questions-container');
+            
+            // Добавляем кнопки с начальными вопросами
+            {{ initial_questions | tojson }}.forEach(question => {
+                const button = document.createElement('button');
+                button.textContent = question;
+                button.classList.add('initial-question-btn');
+                button.addEventListener('click', () => {
+                    inputField.value = question;
+                    sendMessage();
+                });
+                buttonsContainer.appendChild(button);
+            });
+            
+            // Добавляем контейнер с кнопками в начало чат-бокса
+            chatBox.insertBefore(buttonsContainer, chatBox.firstChild);
+        }
+    
+        // Вызываем функцию приветствия при загрузке страницы
+        showWelcomeMessage();
+        // Загрузка предложений для автодополнения
+        async function loadSuggestions() {
+            const response = await fetch('/load_suggestions');
+            const data = await response.json();
+            suggestions = data.suggestions;
+        }
+
+        // Отображение автодополнения
+        function showSuggestion(query) {
+            suggestionBox.innerHTML = '';
+            if (query.length > 0) {
+                const matchedSuggestion = suggestions.find(suggestion => suggestion.toLowerCase().includes(query.toLowerCase()));
+                if (matchedSuggestion) {
+                    const suggestionButton = document.createElement('button');
+                    suggestionButton.textContent = matchedSuggestion;
+                    suggestionButton.classList.add('suggestion-button');
+                    suggestionButton.addEventListener('click', () => {
+                        inputField.value = matchedSuggestion;
+                        suggestionBox.innerHTML = '';
+                        suggestionBox.classList.remove('show');
+                    });
+                    suggestionBox.appendChild(suggestionButton);
+                    suggestionBox.classList.add('show');
+                } else {
+                    suggestionBox.classList.remove('show');
+                }
+            } else {
+                suggestionBox.classList.remove('show');
+            }
+        }
+
+        inputField.addEventListener('input', () => showSuggestion(inputField.value));
+
+        sendButton.addEventListener('click', sendMessage);
+
+        inputField.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') sendMessage();
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleInstructionButton = document.getElementById('toggle-instruction');
+            const pdfContainer = document.getElementById('pdf-container');
+            const mainContainer = document.querySelector('.main-container');
+            const loadingIndicator = document.querySelector('.loading-indicator');
+            const pdfToolbar = document.querySelector('.pdf-toolbar');
+        
+            let isPdfLoaded = false;
+        
+            toggleInstructionButton.addEventListener('click', async () => {
+                if (pdfContainer.classList.contains('hidden')) {
+                    loadingIndicator.style.display = 'block';
+                    mainContainer.classList.add('split');
+                    await loadPdf();
+                    pdfContainer.classList.remove('hidden');
+                    pdfContainer.classList.add('visible');
+                    pdfContainer.style.display = 'block';
+                    toggleInstructionButton.textContent = 'Скрыть руководство';
+                    pdfToolbar.classList.add('visible');
+                } else {
+                    pdfContainer.classList.remove('visible');
+                    pdfContainer.classList.add('hidden');
+                    pdfContainer.style.display = 'none';
+                    mainContainer.classList.remove('split');
+                    toggleInstructionButton.textContent = 'Показать руководство';
+                    pdfToolbar.classList.remove('visible');
+                }
+            });
+        
+            function loadPdf() {
+                var url = '/static/instruction.pdf';
+                var pdfjsLib = window['pdfjs-dist/build/pdf'];
+        
+                pdfjsLib.getDocument(url).promise.then(function(pdf) {
+                    pdfDoc = pdf;
+                    totalPagesSpan.textContent = pdfDoc.numPages;
+                    renderPages(currentPage);
+                    isPdfLoaded = true;
+                    loadingIndicator.style.display = 'none';
+                    pdfContainer.style.display = 'block';
+                    mainContainer.classList.add('split');
+                    toggleInstructionButton.textContent = 'Скрыть руководство';
+                    document.querySelector('.pdf-toolbar').style.display = 'flex';
+                });
+            }
+        });
+
+        function showLoadingIndicator() {
+            loadingIndicator.style.display = 'block';
+        }
+    
+        function hideLoadingIndicator() {
+            loadingIndicator.style.display = 'none';
+        }
+    
+        function renderPages(pageNumber) {
+            pdfPagesContainer.innerHTML = '';
+            const startPage = Math.max(1, pageNumber - Math.floor(pagesToRender / 2));
+            const endPage = Math.min(pdfDoc.numPages, startPage + pagesToRender - 1);
+        
+            showLoadingIndicator();
+        
+            for (let i = startPage; i <= endPage; i++) {
+                pdfDoc.getPage(i).then(function(page) {
+                    viewport = page.getViewport({scale: scale});
+        
+                    var pageContainer = document.createElement('div');
+                    pageContainer.classList.add('pdf-page-container');
+                    pageContainer.setAttribute('data-page-number', i);
+        
+                    var canvas = document.createElement('canvas');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    var context = canvas.getContext('2d');
+        
+                    var renderContext = {
+                        canvasContext: context,
+                        viewport: viewport
+                    };
+        
+                    pageContainer.appendChild(canvas);
+                    pdfPagesContainer.appendChild(pageContainer);
+        
+                    page.render(renderContext).promise.then(() => {
+                        hideLoadingIndicator();
+                        // Добавляем текстовый слой для возможности выделения текста
+                        page.getTextContent().then(function(textContent) {
+                            var textLayer = document.createElement('div');
+                            textLayer.className = 'textLayer';
+                            pageContainer.appendChild(textLayer);
+                            pdfjsLib.renderTextLayer({
+                                textContent: textContent,
+                                container: textLayer,
+                                viewport: viewport,
+                                textDivs: []
+                            });
+                        });
+                    });
+                });
+            }
+        
+            // Обновляем номер текущей страницы и общее количество страниц
+            pageNumberInput.value = pageNumber;
+            totalPagesSpan.textContent = pdfDoc.numPages;
+        
+            // Устанавливаем высоту контейнера для всего документа
+            pdfPagesContainer.style.height = `${pdfDoc.numPages * viewport.height}px`;
+        }
+
+        function scrollToPage(pageNumber) {
+            currentPage = pageNumber;
+            const targetPage = document.querySelector(`.pdf-page-container[data-page-number="${pageNumber}"]`);
+            
+            if (targetPage) {
+                targetPage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                // Если страница еще не отрендерена, рендерим ее
+                renderPages(pageNumber);
+                // После рендеринга прокручиваем к нужной странице
+                setTimeout(() => {
+                    const newTargetPage = document.querySelector(`.pdf-page-container[data-page-number="${pageNumber}"]`);
+                    if (newTargetPage) {
+                        newTargetPage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }, 100);
+            }
+        
+            // Обновляем номер текущей страницы в инпуте
+            pageNumberInput.value = pageNumber;
+        }
+
+        pageNumberInput.addEventListener('change', () => {
+            const pageNumber = parseInt(pageNumberInput.value);
+            if (pageNumber >= 1 && pageNumber <= pdfDoc.numPages) {
+                scrollToPage(pageNumber);
+            }
+        });
+
+        prevPageButton.addEventListener('click', () => {
+            if (currentPage > 1) {
+                scrollToPage(currentPage - 1);
+            }
+        });
+
+        nextPageButton.addEventListener('click', () => {
+            if (currentPage < pdfDoc.numPages) {
+                scrollToPage(currentPage + 1);
+            }
+        });
+
+        zoomInButton.addEventListener('click', () => {
+            scale += 0.25;
+            renderPages(currentPage);
+        });
+
+        zoomOutButton.addEventListener('click', () => {
+            scale = Math.max(0.25, scale - 0.25);
+            renderPages(currentPage);
+        });
+
+        // Обработчик для кнопок pdf-page-button
+        document.addEventListener('click', function(event) {
+            if (event.target.classList.contains('pdf-page-button')) {
+                event.preventDefault();
+                const pageNumber = parseInt(event.target.getAttribute('data-page'));
+                if (!isNaN(pageNumber)) {
+                    scrollToPage(pageNumber);
+                }
+            }
+        });
+
+        burgerMenu.addEventListener('click', () => {
+            tocPanel.style.display = tocPanel.style.display === 'block' ? 'none' : 'block';
+        });
+
+        // Обновляем обработчик прокрутки для отображения текущей страницы
+        pdfPagesContainer.addEventListener('scroll', function() {
+            const pageContainers = document.querySelectorAll('.pdf-page-container');
+            let currentPageNumber = 1;
+        
+            pageContainers.forEach(container => {
+                const rect = container.getBoundingClientRect();
+                if (rect.top <= window.innerHeight / 2 && rect.bottom >= window.innerHeight / 2) {
+                    currentPageNumber = parseInt(container.getAttribute('data-page-number'));
+                }
+            });
+        
+            pageNumberInput.value = currentPageNumber;
+            currentPage = currentPageNumber;
+        });
+
+        async function sendMessage(message = null) {
+            console.log("sendMessage вызвана");
+            const userMessage = message || inputField.value.trim();
+            if (userMessage !== '') {
+                lastQuestion = userMessage;
+                prependMessage(userMessage, 'user-message', '{{ url_for('static', filename='user_icon.png') }}');
+                inputField.value = '';
+                suggestionBox.innerHTML = '';
+        
+                const loadingMessage = prependMessage('Генерация ответа...', 'loading-message');
+        
+                try {
+                    const response = await fetch('/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ question: userMessage, previous_answers: previousAnswers })
+                    });
+        
+                    const data = await response.json();
+                    loadingMessage.remove();
+        
+                    const messageElement = prependMessage(data.answer, 'bot-message', '{{ url_for('static', filename='bot_icon.png') }}', data.images, data.pdf_page);
+        
+                    clearLinksContainer();
+        
+                    if (data.links && data.links.length > 0) {
+                        const newLinksContainer = createLinksContainer(data.links, userMessage);
+                        chatBox.insertBefore(newLinksContainer, chatBox.firstChild);
+                    }
+        
+                    clearButtonsContainer();
+        
+                    if (data.feedback && !isGreeting(userMessage)) {
+                        previousAnswers.push(data.answer);
+                        addFeedbackButtons(messageElement, userMessage, data.answer);
+                    } else {
+                        previousAnswers = [];
+                    }
+        
+                    setTimeout(scrollToBottom, 100);
+                } catch (error) {
+                    console.error("Error sending message:", error);
+                    loadingMessage.remove();
+                    prependMessage("Произошла ошибка при генерации ответа. Пожалуйста, попробуйте позже.", 'bot-message', '{{ url_for('static', filename='bot_icon.png') }}');
+                }
+            }
+        }
+        
+        function displayButtons(buttons) {
+            const buttonsContainer = document.getElementById('buttons-container');
+            buttonsContainer.innerHTML = '';
+            buttons.forEach(button => {
+                const link = document.createElement('button');
+                link.textContent = button.question;
+                link.classList.add('chat-button');
+                link.addEventListener('click', () => sendMessage(button.question));
+                buttonsContainer.appendChild(link);
+            });
+        }
+        
+        function clearButtonsContainer() {
+            const buttonsContainer = document.getElementById('buttons-container');
+            buttonsContainer.innerHTML = '';
+        }
+        
+        // Добавьте эти строки после объявления функции sendMessage
+        sendButton.addEventListener('click', () => sendMessage());
+        inputField.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') sendMessage();
+        });
+
+        function createLinkButton(link) {
+            const button = document.createElement('button');
+            button.textContent = link.question.replace('?', '').trim();
+            
+            if (link.type === 'fork') {
+                button.classList.add('fork-button');
+            } else if (isValidPageNumber(link.url)) {
+                button.classList.add('pdf-page-button');
+                button.setAttribute('data-page', link.url);
+            } else {
+                button.classList.add('link-button');
+            }
+    
+            button.addEventListener('click', function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+                handleLinkButtonClick(link);
+            });
+    
+            return button;
+        }
+
+        
+        async function handleLinkButtonClick(link) {
+            if (link.type === 'fork') {
+                await sendMessage(link.question);
+            } else {
+                if (isValidPageNumber(link.url)) {
+                    togglePdfContainer();
+                    scrollToPage(parseInt(link.url));
+                } else {
+                    await sendLinkQuestion(link.question, link.url);
+                    if (link.url) {
+                        window.open(link.url, '_blank');
+                    }
+                }
+            }
+        }
+        
+        function isValidPageNumber(value) {
+            value = value.toString().trim();
+            return /^\d+$/.test(value);
+        }
+
+        function createLinksContainer(links, questionText) {
+            const newLinksContainer = document.createElement('div');
+            newLinksContainer.classList.add('links-container', 'fade-in');
+        
+            const typeOrder = {
+                'fork': 1,
+                'pdf': 2,
+                'link': 3
+            };
+        
+            const sortedLinks = [...links].sort((a, b) => {
+                return typeOrder[a.type] - typeOrder[b.type];
+            });
+        
+            const visibleLinks = sortedLinks.slice(0, 5);
+            const hiddenLinks = sortedLinks.slice(5);
+        
+            visibleLinks.forEach(link => {
+                if (link.question !== questionText) {
+                    newLinksContainer.appendChild(createLinkButton(link));
+                }
+            });
+        
+            if (hiddenLinks.length > 0) {
+                const showMoreContainer = document.createElement('div');
+                showMoreContainer.classList.add('show-more-container', 'fade-in');
+                showMoreContainer.textContent = `Показать больше (${hiddenLinks.length})`;
+                showMoreContainer.addEventListener('click', () => {
+                    hiddenLinks.forEach(link => {
+                        if (link.question !== questionText) {
+                            newLinksContainer.appendChild(createLinkButton(link));
+                        }
+                    });
+                    showMoreContainer.remove();
+                });
+                newLinksContainer.appendChild(showMoreContainer);
+            }
+        
+            return newLinksContainer;
+        }
+
+        function clearLinksContainer() {
+            const linksContainer = document.querySelector('.links-container');
+            if (linksContainer) linksContainer.remove();
+        }
+
+        function addFeedbackButtons(messageElement, question, answer) {
+            const feedbackContainer = document.createElement('div');
+            feedbackContainer.classList.add('feedback-container');
+
+            const likeButton = createFeedbackButton('like', '{{ url_for('static', filename='like_1.png') }}', '{{ url_for('static', filename='like_2.png') }}');
+            const dislikeButton = createFeedbackButton('dislike', '{{ url_for('static', filename='dislike_1.png') }}', '{{ url_for('static', filename='dislike_2.png') }}');
+
+            feedbackContainer.appendChild(likeButton);
+            feedbackContainer.appendChild(dislikeButton);
+            messageElement.appendChild(feedbackContainer);
+
+            removeOldFeedbackButtons();
+        }
+
+        function createFeedbackButton(feedbackType, initialImage, activeImage) {
+            const button = document.createElement('button');
+            button.classList.add('feedback-button', `${feedbackType}-button`);
+            const image = document.createElement('img');
+            image.src = initialImage;
+            button.appendChild(image);
+            button.addEventListener('click', () => {
+                image.src = activeImage;
+                button.classList.add('disabled');
+                document.querySelector(`.${feedbackType === 'like' ? 'dislike' : 'like'}-button`).classList.add('disabled');
+                sendFeedback(button.parentElement.parentElement, feedbackType);
+            });
+            return button;
+        }
+
+        function removeOldFeedbackButtons() {
+            const messages = chatBox.querySelectorAll('.message');
+            messages.forEach((msg, index) => {
+                if (index !== 0 && msg.classList.contains('bot-message')) {
+                    const feedbackContainer = msg.querySelector('.feedback-container');
+                    if (feedbackContainer) feedbackContainer.remove();
+                }
+            });
+        }
+
+        async function sendLinkQuestion(question, url) {
+            if (question !== '') {
+                lastQuestion = question;
+                prependMessage(question, 'user-message', '{{ url_for('static', filename='user_icon.png') }}');
+        
+                const loadingMessage = prependMessage('Генерация ответа...', 'loading-message');
+        
+                try {
+                    const response = await fetch('/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ question, previous_answers: previousAnswers })
+                    });
+        
+                    const data = await response.json();
+                    loadingMessage.remove();
+        
+                    const messageElement = prependMessage(data.answer, 'bot-message', '{{ url_for('static', filename='bot_icon.png') }}', data.images, data.pdf_page);
+        
+                    clearLinksContainer();
+        
+                    if (data.links && data.links.length > 0) {
+                        const newLinksContainer = createLinksContainer(data.links, question);
+                        chatBox.insertBefore(newLinksContainer, chatBox.firstChild);
+                        setTimeout(scrollToBottom, 100);
+                    } else {
+                        const noLinkContainer = document.createElement('div');
+                        noLinkContainer.classList.add('links-container', 'fade-in');
+                        noLinkContainer.appendChild(createLinkButton({ question, url: '' }));
+                        chatBox.insertBefore(noLinkContainer, chatBox.firstChild);
+                        setTimeout(scrollToBottom, 100);
+                    }
+        
+                    if (data.feedback && !isGreeting(question)) {
+                        previousAnswers.push(data.answer);
+                        addFeedbackButtons(messageElement, question, data.answer);
+                    } else {
+                        previousAnswers = [];
+                    }
+                } catch (error) {
+                    console.error("Error sending link question:", error);
+                    loadingMessage.remove();
+                    prependMessage("Произошла ошибка при генерации ответа. Пожалуйста, попробуйте позже.", 'bot-message', '{{ url_for('static', filename='bot_icon.png') }}');
+                }
+            }
+        }
+
+        function prependMessage(message, className, icon, images = [], pdfPage = null) {
+            message = message.replace(/_x000D_/g, '');
+        
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message', className);
+            messageElement.setAttribute('data-feedback-sent', 'false');
+        
+            if (icon) {
+                const iconElement = document.createElement('img');
+                iconElement.src = icon;
+                messageElement.appendChild(iconElement);
+            }
+        
+            const messageContent = document.createElement('div');
+            messageContent.innerHTML = message;
+            messageElement.appendChild(messageContent);
+        
+            if (pdfPage) {
+                const pageLink = document.createElement('a');
+                pageLink.href = '#';
+                pageLink.textContent = `Страница ${pdfPage}`;
+                pageLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    togglePdfContainer();
+                    scrollToPage(pdfPage);
+                });
+                messageElement.appendChild(pageLink);
+            }
+        
+            chatBox.insertBefore(messageElement, chatBox.firstChild);
+            setTimeout(() => messageElement.classList.add('fade-in', 'slide-in'), 100);
+            setTimeout(scrollToBottom, 100);
+            return messageElement;
+        }
+        
+        function isGreeting(userMessage) {
+            const greetings = ["привет", "здравствуй", "добрый день", "как дела", "погода", "возможности", "ты кто"];
+            return greetings.some(greeting => userMessage.toLowerCase().includes(greeting));
+        }
+    
+        function scrollToBottom() {
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    
+        async function sendFeedback(messageElement, feedbackType) {
+            if (messageElement.getAttribute('data-feedback-sent') === 'true') return;
+    
+            const feedback = { question: lastQuestion, answer: messageElement.textContent };
+            try {
+                const response = await fetch(`/${feedbackType}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: feedback.question, answer: feedback.answer })
+                });
+    
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error(`Error sending ${feedbackType} feedback:`, errorData);
+                } else {
+                    console.log(`${feedbackType} feedback sent successfully`);
+                    messageElement.setAttribute('data-feedback-sent', 'true');
+                }
+            } catch (error) {
+                console.error(`Error sending ${feedbackType} feedback:`, error);
+            }
+        }
+    
+        async function loadToc() {
+            const toc = await pdfDoc.getOutline();
+            toc.forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = item.title;
+                li.addEventListener('click', () => {
+                    togglePdfContainer();
+                    scrollToPage(item.dest[0].num);
+                });
+                tocList.appendChild(li);
+            });
+        }
+
+        function togglePdfContainer() {
+            if (pdfContainer.classList.contains('hidden')) {
+                pdfContainer.classList.remove('hidden');
+                pdfContainer.classList.add('visible');
+                pdfContainer.style.display = 'block';
+                mainContainer.classList.add('split');
+                toggleInstructionButton.textContent = 'Скрыть руководство';
+                pdfToolbar.classList.add('visible');
+            } else {
+                pdfContainer.classList.remove('visible');
+                pdfContainer.classList.add('hidden');
+                pdfContainer.style.display = 'none';
+                mainContainer.classList.remove('split');
+                toggleInstructionButton.textContent = 'Показать руководство';
+                pdfToolbar.classList.remove('visible');
+            }
+        }
+
+        loadSuggestions();
+    </script>
+</body>
+</html>
