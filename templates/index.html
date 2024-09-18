@@ -556,8 +556,15 @@
                 toggleInstructionButton.style.display = 'none';
             }
 
-            function isTelegramInAppBrowser() {
-                return navigator.userAgent.includes('Telegram');
+            if (isTelegramInAppBrowser() || isMobileDevice()) {
+                const pdfContainer = document.getElementById('pdf-container');
+                pdfContainer.style.display = 'none';
+                toggleInstructionButton.style.display = 'none';
+              
+                // Check if the user is coming from Telegram's in-app browser
+                if (document.referrer.includes('telegram.org')) {
+                  alert('Скачивание PDF на мобильных устройствах запрещено.');
+                }
             }
             
             if (isMobileDevice() || isTelegramInAppBrowser()) {
