@@ -329,7 +329,7 @@
             console.log('Hidden PDF Buttons:', hiddenPdfButtons);
         
             initialVisibleLinks.forEach(link => {
-                if (link.question !== questionText) {
+                if (link.question.toLowerCase() !== questionText.toLowerCase()) {
                     newLinksContainer.appendChild(createLinkButton(link));
                 }
             });
@@ -341,7 +341,7 @@
                 showMoreContainer.textContent = `Показать больше (${hiddenLinks.length - hiddenPdfButtons})`;
                 showMoreContainer.addEventListener('click', () => {
                     hiddenLinks.forEach(link => {
-                        if (link.question !== questionText) {
+                        if (link.question.toLowerCase() !== questionText.toLowerCase()) {
                             newLinksContainer.appendChild(createLinkButton(link));
                         }
                     });
