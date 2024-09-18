@@ -57,13 +57,34 @@
 
         // Приветствие при запуске
         function showWelcomeMessage() {
-            const welcomeMessage = "Привет! Я ИнфоКомпас, ваш виртуальный помощник. Чем могу помочь?";
+            const welcomeMessage = `
+                <p class="welcome-title"><strong>Привет! Я ИнфоКомпас, ваш виртуальный помощник.</strong></p>
+                <p class="welcome-text">Чем могу помочь?</p>
+                <p class="welcome-text">Я умею:</p>
+                <ul class="welcome-list">
+                    <li>Отвечать на ваши вопросы.</li>
+                    <li>Предоставлять ссылки на внутренние и внешние ресурсы.</li>
+                    <li>Помогать с навигацией по Руководству пользователя (Далее-РП).</li>
+                </ul>
+                <p class="welcome-text">Как пользоваться:</p>
+                <ul class="welcome-list">
+                    <li>Введите ваш вопрос в поле ввода и нажмите "Отправить".</li>
+                    <li>Используйте кнопки для быстрого взаимодействия:</li>
+                    <ul class="welcome-list">
+                        <li><span class="welcome-button-text blue">Синие кнопки</span> — для внутреннего взаимодействия.</li>
+                        <li><span class="welcome-button-text darkblue">Темно-синие кнопки</span> — для взаимодействия с РП.</li>
+                        <li><span class="welcome-button-text purple">Фиолетовые кнопки</span> — для перехода на внешние источники.</li>
+                    </ul>
+                </ul>
+                <p class="welcome-text">Доступна мобильная версия приложения, но она имеет ограниченный функционал.</p>
+            `;
+        
             prependMessage(welcomeMessage, 'bot-message', '{{ url_for('static', filename='bot_icon.png') }}');
-            
+        
             // Создаем контейнер для кнопок с начальными вопросами
             const buttonsContainer = document.createElement('div');
             buttonsContainer.classList.add('initial-questions-container');
-            
+        
             // Добавляем кнопки с начальными вопросами
             {{ initial_questions | tojson }}.forEach(question => {
                 const button = document.createElement('button');
@@ -75,7 +96,7 @@
                 });
                 buttonsContainer.appendChild(button);
             });
-            
+        
             // Добавляем контейнер с кнопками в начало чат-бокса
             chatBox.insertBefore(buttonsContainer, chatBox.firstChild);
         }

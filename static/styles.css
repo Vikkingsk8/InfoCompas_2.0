@@ -62,53 +62,36 @@ body {
     padding-bottom: 75px;
 }
 
-
-
-/* #pdf-container {
-    flex: 0 0 50%;
-    width: 100%;
-    display: none;
-    overflow: hidden;
-    animation: fadeIn 0.5s ease-in forwards;
+/* Стили для приветственного сообщения */
+.welcome-title {
+    font-size: 18px;
+    font-weight: bold;
 }
 
-#pdf-controls {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 40px;
-    background-color: #f0f0f0;
-    padding: 0 10px;
+.welcome-text {
+    font-size: 16px;
 }
 
-#prev-page, #next-page {
-    background-color: #007BFF;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    padding: 5px 10px;
-    margin: 0 5px;
-    cursor: pointer;
+.welcome-list {
+    font-size: 14px;
 }
 
-#prev-page:hover, #next-page:hover {
-    background-color: #0056b3;
+.welcome-button-text {
+    font-size: 14px;
 }
 
-#page-num, #page-count {
-    margin: 0 5px;
+/* Дополнительные стили для цветов кнопок */
+.welcome-button-text.blue {
+    color: #154fee;
 }
 
-#pdf-viewer {
-    width: 100%;
-    height: calc(100% - 40px);
-    border: none;
-    margin: 0;
-    overflow: auto;
-    transform: scale(1);
-    transform-origin: top right;
-    animation: fadeIn 0.5s ease-in forwards;
-} */
+.welcome-button-text.darkblue {
+    color: #0f32a8;
+}
+
+.welcome-button-text.purple {
+    color: #a12ccf;
+}
 
 
 
@@ -236,7 +219,7 @@ body {
     width: 100%;
     max-width: 800px;
     height: 100%;
-    max-height: calc(100vh - 220px);
+    max-height: calc(100vh - 200px);
     background-color: transparent;
     border-radius: 10px 10px 0 0;
     padding: 20px;
@@ -556,7 +539,7 @@ body {
 }
 
 /* Медиа-запросы для адаптивности под смартфоны */
-@media (max-width: 1200px) {
+@media (max-width: 30cm) {
     .header {
         height: 40px;
     }
@@ -590,6 +573,7 @@ body {
         padding: 5px;
         bottom: 5px;
         width: calc(100% - 20px); /* Убираем горизонтальный скролл */
+        margin-bottom: 25px; /* Увеличиваем нижний отступ для поднятия поля ввода и кнопки */
         
     }
 
@@ -612,12 +596,12 @@ body {
     }
 
     .chat-box {
-        max-width: 100% !important; /* Ограничиваем ширину чат-бокса */
+        max-width: 100% !important; 
         width: 100% !important;
-        max-height: calc(100vh - 180px);
+        max-height: calc(100vh - 150px);
         padding: 15px !important;
         box-sizing: border-box !important;
-        overflow-x: hidden !important; /* Скрываем горизонтальный скролл */
+        overflow-x: hidden !important; 
     }
 
     .message {
