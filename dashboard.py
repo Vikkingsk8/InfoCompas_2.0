@@ -48,12 +48,12 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
 
     @dash_app.callback(
         [Output('metrics-container', 'children'),
-         Output('queries-over-time', 'figure'),
-         Output('queries-by-day', 'figure'),
-         Output('queries-by-week', 'figure'),
-         Output('queries-by-month', 'figure'),
-         Output('top-questions', 'figure'),
-         Output('feedback-distribution', 'figure')],
+        Output('queries-over-time', 'figure'),
+        Output('queries-by-day', 'figure'),
+        Output('queries-by-week', 'figure'),
+        Output('queries-by-month', 'figure'),
+        Output('top-questions', 'figure'),
+        Output('feedback-distribution', 'figure')],
         Input('interval-component', 'n_intervals')
     )
     def update_metrics(n):
@@ -74,7 +74,9 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
         # График запросов по времени
         queries_df = pd.DataFrame(list(data['queries_over_time'].items()), columns=['time', 'count'])
         queries_df['time'] = pd.to_datetime(queries_df['time'])
-        queries_fig = px.line(queries_df, x='time', y='count', title="Запросы по времени")
+        queries_df.set_index('time', inplace=True)
+        queries_df_hourly = queries_df.resample('H').sum()  # Суммируем запросы по часам
+        queries_fig = px.line(queries_df_hourly, x=queries_df_hourly.index, y='count', title="Запросы по времени")
         
         # График запросов по дням
         queries_by_day = pd.DataFrame(list(data['queries_by_day'].items()), columns=['day', 'count'])
