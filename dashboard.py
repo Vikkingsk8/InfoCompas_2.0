@@ -153,6 +153,6 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
         wb.save(excel_buffer)
         excel_buffer.seek(0)
 
-        return dcc.send_file(excel_buffer, "dashboard_data.xlsx")
+        return dcc.send_bytes(excel_buffer.getvalue(), "dashboard_data.xlsx")
 
     return dash_app

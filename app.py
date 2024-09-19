@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, session, send_file, make_response
+from flask import Flask, request, jsonify, render_template, session, send_file
 from flask_caching import Cache
 import tempfile
 import pandas as pd
@@ -18,7 +18,9 @@ import datetime
 import requests
 from dashboard import create_dash_app
 from config import Config
-import io
+from io import BytesIO
+import uuid
+from openpyxl import Workbook
 
 
 app = Flask(__name__)
@@ -37,6 +39,7 @@ total_queries = 0
 successful_queries = 0
 query_history = []
 feedback_history = []
+unique_users_history = []
 
 tokenizer = AutoTokenizer.from_pretrained("cointegrated/rubert-tiny2")
 model = AutoModel.from_pretrained("cointegrated/rubert-tiny2")
@@ -161,8 +164,6 @@ def find_best_answer(query, embedding_weight=0.7, levenshtein_weight=0.15, bm25_
     
     query_embedding = get_embedding(query)
     
-    # Остальной код функции...
-    
     # Расчет сходства эмбеддингов
     embedding_similarities = cosine_similarity([query_embedding], df_answers['embedding'].tolist())[0]
     
@@ -258,6 +259,7 @@ def download_pdf():
     logger.info(f"Отправляем кэшированный файл. Путь: {cached_pdf_path}")
     return send_file(cached_pdf_path, as_attachment=False)
 
+
 @app.route('/load_suggestions', methods=['GET'])
 def load_suggestions():
     suggestions = [q.strip().rstrip('?') for question in df_answers['Текст_вопроса'].tolist() for q in question.split('?') if q.strip()]
@@ -276,6 +278,23 @@ def index():
     initial_questions = load_initial_questions()
     logging.debug("Rendering index.html with initial questions")
     return render_template('index.html', initial_questions=initial_questions)
+
+
+
+def track_user(user_id, username, first_name, last_name, timestamp):
+    user_info = {
+        'user_id': user_id,
+        'username': username,
+        'first_name': first_name,
+        'last_name': last_name,
+        'time': timestamp
+    }
+    unique_users_history.append(user_info)
+
+@app.before_request
+def before_request():
+    if 'user_id' not in session:
+        session['user_id'] = str(uuid.uuid4())
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -301,6 +320,9 @@ def chat():
         
         total_queries += 1
         query_time = datetime.datetime.now()
+        
+        # Отслеживание пользователя
+        track_user(session['user_id'], request.remote_addr, '', '', query_time)
         
         if not is_valid:
             query_history.append({'time': query_time, 'question': user_question, 'success': False})
@@ -459,6 +481,12 @@ def get_analytics_data():
             queries_by_week = {}
             queries_by_month = {}
         
+        # Сбор данных о лайках и дизлайках
+        feedback_df = pd.read_excel(Config.FEEDBACK_FILE)
+        likes = feedback_df['likes'].sum()
+        dislikes = feedback_df['dislikes'].sum()
+        feedback_distribution = {'likes': likes, 'dislikes': dislikes}
+        
         return jsonify({
             'total_queries': total_queries,
             'successful_queries': successful_queries,
@@ -473,7 +501,7 @@ def get_analytics_data():
     except Exception as e:
         app.logger.error(f"Ошибка в /analytics_data: {str(e)}")
         return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
-
+    
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
