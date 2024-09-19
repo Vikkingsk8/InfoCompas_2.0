@@ -75,7 +75,7 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
         queries_df = pd.DataFrame(list(data['queries_over_time'].items()), columns=['time', 'count'])
         queries_df['time'] = pd.to_datetime(queries_df['time'])
         queries_df.set_index('time', inplace=True)
-        queries_df_hourly = queries_df.resample('H').sum()  # Суммируем запросы по часам
+        queries_df_hourly = queries_df.resample('h').sum()  # Суммируем запросы по часам
         queries_fig = px.line(queries_df_hourly, x=queries_df_hourly.index, y='count', title="Запросы по времени")
         
         # График запросов по дням
