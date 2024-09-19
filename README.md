@@ -114,32 +114,32 @@ python -m unittest test_app.py
 
 ## Структура проекта
 
-Infokompas/
-├── app.py
-├── .gitattributes
-├── requirements.txt
-├── LICENSE.md
-├── README.md
-├── test_app.py
-├── model/
-│ ├── config.json
-│ ├── model.safetensors
-│ ├── special_tokens_map.json
-│ ├── tokenizer.json
-│ ├── tokenizer_config.json
-│ └── vocab.txt
-├── data/
-│ ├── ответы.xlsx
-│ ├── links.xlsx
-│ └── instruction.pdf
-├── static/
-│ ├── styles.css
-│ ├── background.jpg
-│ ├── bot_icon.png
-│ ├── image.png
-│ └── user_icon.png
-└── templates/
-└── index.html
+Infokompas/<br>
+├── app.py<br>
+├── .gitattributes<br>
+├── requirements.txt<br>
+├── LICENSE.md<br>
+├── README.md<br>
+├── test_app.py<br>
+├── model/<br>
+│ ├── config.json<br>
+│ ├── model.safetensors<br>
+│ ├── special_tokens_map.json<br>
+│ ├── tokenizer.json<br>
+│ ├── tokenizer_config.json<br>
+│ └── vocab.txt<br>
+├── data/<br>
+│ ├── ответы.xlsx<br>
+│ ├── links.xlsx<br>
+│ └── instruction.pdf<br>
+├── static/<br>
+│ ├── styles.css<br>
+│ ├── background.jpg<br>
+│ ├── bot_icon.png<br>
+│ ├── image.png<br>
+│ └── user_icon.png<br>
+└── templates/<br>
+└── index.html<br>
 
 
 
