@@ -222,6 +222,9 @@
             }
         }
         
+
+
+        
         function displayButtons(buttons) {
             const buttonsContainer = document.getElementById('buttons-container');
             buttonsContainer.innerHTML = '';
@@ -310,21 +313,21 @@
         
             // Фильтруем скрытые кнопки на мобильных устройствах
             const visibleLinks = sortedLinks.filter(link => {
-                const isHidden = isMobileDevice() && link.classList && link.classList.contains('pdf-page-button');
+                const isHidden = isMobileDevice() && link.url && /^\d+$/.test(link.url);
                 console.log('Link:', link, 'isHidden:', isHidden);
                 return !isHidden;
             });
         
             console.log('Visible Links:', visibleLinks);
         
-            const initialVisibleLinks = visibleLinks.slice(0, 5);
-            const hiddenLinks = visibleLinks.slice(5);
+            const initialVisibleLinks = visibleLinks.slice(0, 6);
+            const hiddenLinks = visibleLinks.slice(6);
         
             // Подсчет скрытых кнопок PDF
             const hiddenPdfButtons = sortedLinks.filter(link => {
                 const isHidden = isMobileDevice() && link.url && /^\d+$/.test(link.url);
                 return isHidden;
-              }).length;
+            }).length;
         
             console.log('Hidden PDF Buttons:', hiddenPdfButtons);
         
@@ -334,13 +337,20 @@
                 }
             });
         
-            if (hiddenLinks.length > 0) {
+            // Исправленная логика для hiddenLinks
+            const visibleLinksWithoutHiddenPdf = visibleLinks.filter(link => {
+                return !(isMobileDevice() && link.url && /^\d+$/.test(link.url));
+            });
+        
+            const hiddenLinksWithoutHiddenPdf = visibleLinksWithoutHiddenPdf.slice(6);
+        
+            if (hiddenLinksWithoutHiddenPdf.length > 0) {
                 const showMoreContainer = document.createElement('div');
                 showMoreContainer.classList.add('show-more-container', 'fade-in');
                 // Вычитаем количество скрытых кнопок PDF из общего числа скрытых кнопок
-                showMoreContainer.textContent = `Показать больше (${hiddenLinks.length - hiddenPdfButtons})`;
+                showMoreContainer.textContent = `Показать больше (${hiddenLinksWithoutHiddenPdf.length})`;
                 showMoreContainer.addEventListener('click', () => {
-                    hiddenLinks.forEach(link => {
+                    hiddenLinksWithoutHiddenPdf.forEach(link => {
                         if (link.question.toLowerCase() !== questionText.toLowerCase()) {
                             newLinksContainer.appendChild(createLinkButton(link));
                         }
