@@ -219,7 +219,7 @@ conversational_responses = {
 def load_initial_questions():
     try:
         df = pd.read_excel(Config.CROSSROAD_FILE)
-        questions = df['Вопрос'].tolist()[:5]
+        questions = df['Вопрос'].tolist()[:6]
         return questions
     except Exception as e:
         logging.error(f"Ошибка при загрузке начальных вопросов: {e}")
