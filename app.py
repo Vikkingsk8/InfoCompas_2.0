@@ -513,7 +513,7 @@ def get_analytics_data():
         queries_by_month = {}
         
         for time, success in query_history:
-            time = datetime.datetime.strptime(time, '%Y-%m-%d %H:%M:%S')
+            time = datetime.datetime.strptime(time, '%Y-%m-%d %H:%M:%S.%f')  # Используем формат с миллисекундами
             time_str = time.strftime('%Y-%m-%d %H:%M:%S')
             day_str = time.strftime('%Y-%m-%d')
             week_str = time.strftime('%Y-%W')
