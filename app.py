@@ -442,6 +442,16 @@ def save_feedback(question, answer, feedback):
 
     df.to_excel(Config.FEEDBACK_FILE, index=False)
 
+    # Запись данных в базу данных dashboard_data.db
+    conn = sqlite3.connect(Config.SQLITE_DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO feedback (time, question, answer, feedback_type, comment)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (datetime.datetime.now(), question, answer, feedback, ''))
+    conn.commit()
+    conn.close()
+
 @app.route('/like', methods=['POST'])
 def like():
     try:
