@@ -5,6 +5,10 @@ import pandas as pd
 import requests
 from openpyxl import Workbook
 from io import BytesIO
+import logging
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
 
 def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
     dash_app = Dash(__name__, server=flask_app, routes_pathname_prefix=routes_pathname_prefix)
@@ -34,6 +38,9 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
                 dcc.Graph(id='feedback-distribution'),
             ], style={'width': '50%', 'display': 'inline-block'}),
         ]),
+        html.Div([
+            dcc.Graph(id='visits-over-time'),  # Добавляем компонент для графика посещаемости
+        ], style={'width': '100%', 'display': 'inline-block'}),
         html.Button("Экспорт в Excel", id="export-button", n_clicks=0),
         dcc.Download(id="download-excel")
     ], style={
@@ -47,15 +54,15 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
     })
 
     @dash_app.callback(
-    [Output('metrics-container', 'children'),
-    Output('queries-over-time', 'figure'),
-    Output('queries-by-day', 'figure'),
-    Output('queries-by-week', 'figure'),
-    Output('queries-by-month', 'figure'),
-    Output('top-questions', 'figure'),
-    Output('feedback-distribution', 'figure'),
-    Output('visits-over-time', 'figure')],  # Добавляем вывод для графика посещаемости
-    Input('interval-component', 'n_intervals')
+        [Output('metrics-container', 'children'),
+         Output('queries-over-time', 'figure'),
+         Output('queries-by-day', 'figure'),
+         Output('queries-by-week', 'figure'),
+         Output('queries-by-month', 'figure'),
+         Output('top-questions', 'figure'),
+         Output('feedback-distribution', 'figure'),
+         Output('visits-over-time', 'figure')],  # Добавляем вывод для графика посещаемости
+        Input('interval-component', 'n_intervals')
     )
     def update_metrics(n):
         try:
