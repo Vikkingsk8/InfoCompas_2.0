@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, session, send_file, make_response
+from flask import Flask, request, jsonify, render_template, session, send_file
 from flask_caching import Cache
 import tempfile
 import pandas as pd
@@ -19,6 +19,7 @@ import requests
 from dashboard import create_dash_app
 from config import Config
 import io
+import sqlite3
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -225,6 +226,37 @@ def load_initial_questions():
         logging.error(f"Ошибка при загрузке начальных вопросов: {e}")
         return []
 
+def init_db():
+    if not os.path.exists(Config.DATA_DIR):
+        os.makedirs(Config.DATA_DIR)
+
+    if not os.path.exists(Config.SQLITE_DB_PATH):
+        conn = sqlite3.connect(Config.SQLITE_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE queries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                time TIMESTAMP,
+                question TEXT,
+                success BOOLEAN
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                time TIMESTAMP,
+                question TEXT,
+                answer TEXT,
+                feedback_type TEXT,
+                comment TEXT
+            )
+        ''')
+        conn.commit()
+        conn.close()
+
+init_db()
+
+
 @app.route('/download_pdf')
 def download_pdf():
     cached_pdf_path = cache.get('cached_pdf_path')
@@ -301,8 +333,17 @@ def chat():
         total_queries += 1
         query_time = datetime.datetime.now()
         
+        conn = sqlite3.connect(Config.SQLITE_DB_PATH)
+        cursor = conn.cursor()
+        
         if not is_valid:
             query_history.append({'time': query_time, 'question': user_question, 'success': False})
+            cursor.execute('''
+                INSERT INTO queries (time, question, success)
+                VALUES (?, ?, ?)
+            ''', (query_time, user_question, False))
+            conn.commit()
+            conn.close()
             return jsonify({'answer': "Извините, я не совсем понял ваш вопрос. Пожалуйста, перефразируйте его или задайте более конкретный вопрос.", 'feedback': False})
         
         # Если вопрос валидный, ищем ответ на оригинальный вопрос пользователя
@@ -313,10 +354,22 @@ def chat():
         
         if answer is None:
             query_history.append({'time': query_time, 'question': user_question, 'success': False})
+            cursor.execute('''
+                INSERT INTO queries (time, question, success)
+                VALUES (?, ?, ?)
+            ''', (query_time, user_question, False))
+            conn.commit()
+            conn.close()
             return jsonify({'answer': "Извините, я не могу найти подходящий ответ на ваш вопрос. Пожалуйста, перефразируйте его или задайте другой вопрос.", 'feedback': False})
         
         successful_queries += 1
         query_history.append({'time': query_time, 'question': user_question, 'success': True})
+        cursor.execute('''
+            INSERT INTO queries (time, question, success)
+            VALUES (?, ?, ?)
+        ''', (query_time, user_question, True))
+        conn.commit()
+        conn.close()
         
         links = find_relevant_links(user_question_lower)
         fork_links = find_relevant_fork_links(user_question_lower)
@@ -333,7 +386,6 @@ def chat():
     except Exception as e:
         logging.error(f"Ошибка в /chat: {e}")
         return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
-    
 
 @app.route('/feedback', methods=['POST'])
 def feedback():
@@ -348,19 +400,17 @@ def feedback():
         return jsonify({'error': 'Не все необходимые данные предоставлены'}), 400
 
     try:
-        df = pd.read_excel(Config.FEEDBACK_FILE) if os.path.exists(Config.FEEDBACK_FILE) else pd.DataFrame()
-        new_feedback = pd.DataFrame({
-            'Вопрос': [question],
-            'Ответ': [answer],
-            'Тип обратной связи': [feedback_type],
-            'Комментарий': [comment],
-            'Дата': [pd.Timestamp.now()]
-        })
-        df = pd.concat([df, new_feedback], ignore_index=True)
-        df.to_excel(Config.FEEDBACK_FILE, index=False)
+        conn = sqlite3.connect(Config.SQLITE_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO feedback (time, question, answer, feedback_type, comment)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (datetime.datetime.now(), question, answer, feedback_type, comment))
+        conn.commit()
+        conn.close()
         
         feedback_history.append({
-            'time': pd.Timestamp.now(),
+            'time': datetime.datetime.now(),
             'question': question,
             'answer': answer,
             'feedback_type': feedback_type,
@@ -431,38 +481,55 @@ def render_dashboard():
 @app.route('/analytics_data', methods=['GET'])
 def get_analytics_data():
     try:
-        global total_queries, successful_queries, query_history, feedback_history
+        conn = sqlite3.connect(Config.SQLITE_DB_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT COUNT(*) FROM queries')
+        total_queries = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM queries WHERE success = 1')
+        successful_queries = cursor.fetchone()[0]
         
         success_rate = (successful_queries / total_queries) * 100 if total_queries > 0 else 0
         
-        questions = [q['question'] for q in query_history]
-        top_questions = Counter(questions).most_common(10)
+        cursor.execute('SELECT question, COUNT(*) as count FROM queries GROUP BY question ORDER BY count DESC LIMIT 10')
+        top_questions = cursor.fetchall()
         
-        feedback_types = [f['feedback_type'] for f in feedback_history]
-        feedback_distribution = dict(Counter(feedback_types))
+        cursor.execute('SELECT feedback_type, COUNT(*) as count FROM feedback GROUP BY feedback_type')
+        feedback_distribution = dict(cursor.fetchall())
         
-        df = pd.DataFrame(query_history)
-        if not df.empty:
-            df['time'] = pd.to_datetime(df['time'])
-            df['day'] = df['time'].dt.date
-            df['week'] = df['time'].dt.to_period('W').astype(str)
-            df['month'] = df['time'].dt.to_period('M').astype(str)
+        cursor.execute('SELECT time, success FROM queries ORDER BY time')
+        query_history = cursor.fetchall()
+        
+        queries_over_time = {}
+        queries_by_day = {}
+        queries_by_week = {}
+        queries_by_month = {}
+        
+        for time, success in query_history:
+            time = datetime.datetime.strptime(time, '%Y-%m-%d %H:%M:%S')
+            time_str = time.strftime('%Y-%m-%d %H:%M:%S')
+            day_str = time.strftime('%Y-%m-%d')
+            week_str = time.strftime('%Y-%W')
+            month_str = time.strftime('%Y-%m')
             
-            queries_over_time = df.groupby('time').size().to_dict()
-            queries_by_day = df.groupby('day').size().to_dict()
-            queries_by_week = df.groupby('week').size().to_dict()
-            queries_by_month = df.groupby('month').size().to_dict()
-        else:
-            queries_over_time = {}
-            queries_by_day = {}
-            queries_by_week = {}
-            queries_by_month = {}
+            if time_str not in queries_over_time:
+                queries_over_time[time_str] = 0
+            queries_over_time[time_str] += 1
+            
+            if day_str not in queries_by_day:
+                queries_by_day[day_str] = 0
+            queries_by_day[day_str] += 1
+            
+            if week_str not in queries_by_week:
+                queries_by_week[week_str] = 0
+            queries_by_week[week_str] += 1
+            
+            if month_str not in queries_by_month:
+                queries_by_month[month_str] = 0
+            queries_by_month[month_str] += 1
         
-        # Сбор данных о лайках и дизлайках
-        feedback_df = pd.read_excel(Config.FEEDBACK_FILE)
-        likes = int(feedback_df['likes'].sum())  # Преобразуем в int
-        dislikes = int(feedback_df['dislikes'].sum())  # Преобразуем в int
-        feedback_distribution = {'likes': likes, 'dislikes': dislikes}
+        conn.close()
         
         return jsonify({
             'total_queries': total_queries,
@@ -470,10 +537,10 @@ def get_analytics_data():
             'success_rate': success_rate,
             'top_questions': top_questions,
             'feedback_distribution': feedback_distribution,
-            'queries_over_time': {str(k): v for k, v in queries_over_time.items()},
-            'queries_by_day': {str(k): v for k, v in queries_by_day.items()},
-            'queries_by_week': {str(k): v for k, v in queries_by_week.items()},
-            'queries_by_month': {str(k): v for k, v in queries_by_month.items()}
+            'queries_over_time': queries_over_time,
+            'queries_by_day': queries_by_day,
+            'queries_by_week': queries_by_week,
+            'queries_by_month': queries_by_month
         })
     except Exception as e:
         app.logger.error(f"Ошибка в /analytics_data: {str(e)}")

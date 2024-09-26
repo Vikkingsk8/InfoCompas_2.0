@@ -14,3 +14,6 @@ class Config:
     CACHE_TYPE = 'filesystem'
     CACHE_DIR = CACHE_DIR  # Директория для хранения кэша
     CACHE_DEFAULT_TIMEOUT = 3600  # Время жизни кэша в секундах (1 час)
+
+    # Путь к базе данных SQLite
+    SQLITE_DB_PATH = os.path.join(DATA_DIR, 'dashboard_data.db')
