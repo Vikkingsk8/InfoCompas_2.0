@@ -253,8 +253,10 @@ def init_db():
         ''')
         conn.commit()
         conn.close()
-
-init_db()
+        logging.info("Таблицы queries и feedback созданы.")
+    else:
+        logging.info("База данных уже существует.")
+        
 
 
 @app.route('/download_pdf')
@@ -486,20 +488,26 @@ def get_analytics_data():
         
         cursor.execute('SELECT COUNT(*) FROM queries')
         total_queries = cursor.fetchone()[0]
+        logging.info(f"Всего запросов: {total_queries}")
         
         cursor.execute('SELECT COUNT(*) FROM queries WHERE success = 1')
         successful_queries = cursor.fetchone()[0]
+        logging.info(f"Успешных запросов: {successful_queries}")
         
         success_rate = (successful_queries / total_queries) * 100 if total_queries > 0 else 0
+        logging.info(f"Процент успешных запросов: {success_rate:.2f}%")
         
         cursor.execute('SELECT question, COUNT(*) as count FROM queries GROUP BY question ORDER BY count DESC LIMIT 10')
         top_questions = cursor.fetchall()
+        logging.info(f"Топ-10 вопросов: {top_questions}")
         
         cursor.execute('SELECT feedback_type, COUNT(*) as count FROM feedback GROUP BY feedback_type')
         feedback_distribution = dict(cursor.fetchall())
+        logging.info(f"Распределение обратной связи: {feedback_distribution}")
         
         cursor.execute('SELECT time, success FROM queries ORDER BY time')
         query_history = cursor.fetchall()
+        logging.info(f"История запросов: {query_history}")
         
         queries_over_time = {}
         queries_by_day = {}

@@ -47,23 +47,25 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
     })
 
     @dash_app.callback(
-        [Output('metrics-container', 'children'),
-        Output('queries-over-time', 'figure'),
-        Output('queries-by-day', 'figure'),
-        Output('queries-by-week', 'figure'),
-        Output('queries-by-month', 'figure'),
-        Output('top-questions', 'figure'),
-        Output('feedback-distribution', 'figure')],
-        Input('interval-component', 'n_intervals')
+    [Output('metrics-container', 'children'),
+    Output('queries-over-time', 'figure'),
+    Output('queries-by-day', 'figure'),
+    Output('queries-by-week', 'figure'),
+    Output('queries-by-month', 'figure'),
+    Output('top-questions', 'figure'),
+    Output('feedback-distribution', 'figure'),
+    Output('visits-over-time', 'figure')],  # Добавляем вывод для графика посещаемости
+    Input('interval-component', 'n_intervals')
     )
     def update_metrics(n):
         try:
             response = requests.get('http://176.109.109.61:8080/analytics_data')
             response.raise_for_status()
             data = response.json()
+            logging.info(f"Данные от API: {data}")
         except requests.RequestException as e:
             print(f"Ошибка при запросе к API: {e}")
-            return html.Div("Ошибка при получении данных"), {}, {}, {}, {}, {}, {}
+            return html.Div("Ошибка при получении данных"), {}, {}, {}, {}, {}, {}, {}
 
         metrics = [
             html.P(f"Всего запросов: {data['total_queries']}"),
@@ -100,7 +102,14 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
         feedback_df = pd.DataFrame(list(data['feedback_distribution'].items()), columns=['feedback', 'count'])
         feedback_fig = px.pie(feedback_df, values='count', names='feedback', title="Распределение обратной связи")
         
-        return metrics, queries_fig, queries_by_day_fig, queries_by_week_fig, queries_by_month_fig, top_questions_fig, feedback_fig
+        # График посещаемости
+        visits_df = pd.DataFrame(list(data['visits_over_time'].items()), columns=['time', 'count'])
+        visits_df['time'] = pd.to_datetime(visits_df['time'])
+        visits_df.set_index('time', inplace=True)
+        visits_hourly = visits_df.resample('h').sum()  # Суммируем посещения по часам
+        visits_fig = px.line(visits_hourly, x=visits_hourly.index, y='count', title="Посещаемость бота по часам")
+        
+        return metrics, queries_fig, queries_by_day_fig, queries_by_week_fig, queries_by_month_fig, top_questions_fig, feedback_fig, visits_fig
 
     @dash_app.callback(
         Output("download-excel", "data"),
