@@ -161,8 +161,6 @@ def find_best_answer(query, embedding_weight=0.7, levenshtein_weight=0.15, bm25_
     
     query_embedding = get_embedding(query)
     
-    # Остальной код функции...
-    
     # Расчет сходства эмбеддингов
     embedding_similarities = cosine_similarity([query_embedding], df_answers['embedding'].tolist())[0]
     
@@ -256,8 +254,8 @@ def init_db():
         logging.info("Таблицы queries и feedback созданы.")
     else:
         logging.info("База данных уже существует.")
-        
 
+init_db()
 
 @app.route('/download_pdf')
 def download_pdf():
