@@ -55,13 +55,13 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
 
     @dash_app.callback(
         [Output('metrics-container', 'children'),
-         Output('queries-over-time', 'figure'),
-         Output('queries-by-day', 'figure'),
-         Output('queries-by-week', 'figure'),
-         Output('queries-by-month', 'figure'),
-         Output('top-questions', 'figure'),
-         Output('feedback-distribution', 'figure'),
-         Output('visits-over-time', 'figure')],  # Добавляем вывод для графика посещаемости
+        Output('queries-over-time', 'figure'),
+        Output('queries-by-day', 'figure'),
+        Output('queries-by-week', 'figure'),
+        Output('queries-by-month', 'figure'),
+        Output('top-questions', 'figure'),
+        Output('feedback-distribution', 'figure'),
+        Output('visits-over-time', 'figure')],  # Добавляем вывод для графика посещаемости
         Input('interval-component', 'n_intervals')
     )
     def update_metrics(n):
@@ -110,14 +110,17 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
         feedback_fig = px.pie(feedback_df, values='count', names='feedback', title="Распределение обратной связи")
         
         # График посещаемости
-        visits_df = pd.DataFrame(list(data['visits_over_time'].items()), columns=['time', 'count'])
-        visits_df['time'] = pd.to_datetime(visits_df['time'])
-        visits_df.set_index('time', inplace=True)
-        visits_hourly = visits_df.resample('h').sum()  # Суммируем посещения по часам
-        visits_fig = px.line(visits_hourly, x=visits_hourly.index, y='count', title="Посещаемость бота по часам")
+        if 'visits_over_time' in data:
+            visits_df = pd.DataFrame(list(data['visits_over_time'].items()), columns=['time', 'count'])
+            visits_df['time'] = pd.to_datetime(visits_df['time'])
+            visits_df.set_index('time', inplace=True)
+            visits_hourly = visits_df.resample('h').sum()  # Суммируем посещения по часам
+            visits_fig = px.line(visits_hourly, x=visits_hourly.index, y='count', title="Посещаемость бота по часам")
+        else:
+            visits_fig = {}  # Или другое значение по умолчанию
         
         return metrics, queries_fig, queries_by_day_fig, queries_by_week_fig, queries_by_month_fig, top_questions_fig, feedback_fig, visits_fig
-
+    
     @dash_app.callback(
         Output("download-excel", "data"),
         Input("export-button", "n_clicks"),
