@@ -320,14 +320,14 @@ python -m unittest test_app.py
 ### Тестирование отказоустойчивости
 
 #### Установка locust
-- 'pip install locust'
+- `pip install locust`
 
 #### Запуск locust
 
-- 'locust -f locustfile.py --host=http://localhost:8080'
+- `locust -f locustfile.py --host=http://localhost:8080`</br>
 Замените http://localhost:8080 на адрес вашего сервера, если он запущен на другом хосте или порту.
 
-- Откройте браузер и перейдите по адресу 'http://localhost:8089'. Введите количество пользователей и скорость их набора, затем нажмите "Start swarming".
+- Откройте браузер и перейдите по адресу `http://localhost:8089`. Введите количество пользователей и скорость их набора, затем нажмите "Start swarming".
 
 #### Анализ результатов:
 RPS (Requests Per Second): Количество запросов в секунду, которое ваш сервер может обработать.
