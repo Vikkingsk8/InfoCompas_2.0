@@ -339,7 +339,7 @@ Failures: Количество неудачных запросов.
 Users: Количество одновременных пользователей, которые могут взаимодействовать с вашим ботом.
 
 
-<img src = https://github.com/Vikkingsk8/InfoCompas_2.0/tree/main/static/number_of_users.png></br>
+<img src = https://github.com/Vikkingsk8/InfoCompas_2.0/blob/main/static/number_of_users.png></br>
 
 ## Структура проекта
 
