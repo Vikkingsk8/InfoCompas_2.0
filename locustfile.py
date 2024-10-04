@@ -1,3 +1,4 @@
+# Авторы: Ермилов В.В., Файбисович В.А.
 from locust import HttpUser, task, between
 import random
 
