@@ -1,3 +1,4 @@
+# Авторы: Ермилов В.В., Файбисович В.А.
 import unittest
 from app import app
 import pandas as pd

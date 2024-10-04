@@ -1,3 +1,4 @@
+# Авторы: Ермилов В.В., Файбисович В.А.
 from flask import Flask, request, jsonify, render_template, session, send_file
 from flask_caching import Cache
 import tempfile

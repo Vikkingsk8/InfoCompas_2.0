@@ -316,6 +316,31 @@ python -m unittest test_app.py
 - `test_dislike_endpoint`: Проверяет, что эндпоинт `/dislike` корректно обрабатывает дизлайки.
 - `test_analytics_data_endpoint`: Проверяет, что эндпоинт `/analytics_data` возвращает корректные аналитические данные.
 
+
+### Тестирование отказоустойчивости
+
+#### Установка locust
+- 'pip install locust'
+
+#### Запуск locust
+
+- 'locust -f locustfile.py --host=http://localhost:8080'
+Замените http://localhost:8080 на адрес вашего сервера, если он запущен на другом хосте или порту.
+
+- Откройте браузер и перейдите по адресу 'http://localhost:8089'. Введите количество пользователей и скорость их набора, затем нажмите "Start swarming".
+
+#### Анализ результатов:
+RPS (Requests Per Second): Количество запросов в секунду, которое ваш сервер может обработать.
+
+Response Time: Время ответа сервера на запросы.
+
+Failures: Количество неудачных запросов.
+
+Users: Количество одновременных пользователей, которые могут взаимодействовать с вашим ботом.
+
+
+<img src = https://github.com/Vikkingsk8/InfoCompas_2.0/tree/main/static/number_of_users.png></br>
+
 ## Структура проекта
 
 Infokompas/<br>

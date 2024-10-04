@@ -1,3 +1,4 @@
+# Авторы: Ермилов В.В., Файбисович В.А.
 from dash import Dash, dcc, html
 from dash.dependencies import Input, Output
 import plotly.express as px
