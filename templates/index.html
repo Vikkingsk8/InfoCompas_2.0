@@ -8,6 +8,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ИнфоКомпас</title>
+    <link rel="canonical" href="https://инфокомпас.рф/">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
     <link rel="icon" href="{{ url_for('static', filename='icon.png') }}">
@@ -144,6 +145,18 @@
 
         inputField.addEventListener('keypress', (event) => {
             if (event.key === 'Enter') sendMessage();
+        });
+
+        document.addEventListener("DOMContentLoaded", function() {
+            const originalDomain = "инфокомпас.рф";
+            const punycodeDomain = "xn--80apgidgbjtx.xn--p1ai";
+            const originalDomainWithWWW = "www.инфокомпас.рф";
+            const punycodeDomainWithWWW = "www.xn--80apgidgbjtx.xn--p1ai";
+        
+            if (window.location.hostname === punycodeDomain || window.location.hostname === punycodeDomainWithWWW) {
+                const newHostname = window.location.hostname === punycodeDomain ? originalDomain : originalDomainWithWWW;
+                window.history.replaceState({}, document.title, window.location.protocol + "//" + newHostname + window.location.pathname + window.location.search + window.location.hash);
+            }
         });
 
         document.addEventListener('DOMContentLoaded', function() {
