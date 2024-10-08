@@ -146,6 +146,19 @@
             if (event.key === 'Enter') sendMessage();
         });
 
+        function decodePunycode(url) {
+            var parser = new DOMParser();
+            var decodedUrl = new URL(url);
+            decodedUrl.hostname = punycode.toUnicode(decodedUrl.hostname);
+            return decodedUrl.toString();
+        }
+    
+        document.addEventListener('DOMContentLoaded', function() {
+            var links = document.querySelectorAll('a[href]');
+            links.forEach(function(link) {
+                link.href = decodePunycode(link.href);
+            });
+        });
 
         document.addEventListener('DOMContentLoaded', function() {
             const toggleInstructionButton = document.getElementById('toggle-instruction');
