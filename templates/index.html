@@ -150,9 +150,16 @@
             const originalDomainWithWWW = "www.инфокомпас.рф";
             const punycodeDomainWithWWW = "www.xn--80apgidgbjtx.xn--p1ai";
         
+            console.log("Проверка домена...");
+            console.log("Текущий домен:", window.location.hostname);
+        
             if (window.location.hostname === punycodeDomain || window.location.hostname === punycodeDomainWithWWW) {
                 const newHostname = window.location.hostname === punycodeDomain ? originalDomain : originalDomainWithWWW;
+                console.log("Замена домена на:", newHostname);
                 window.history.replaceState({}, document.title, window.location.protocol + "//" + newHostname + window.location.pathname + window.location.search + window.location.hash);
+                console.log("Домен успешно заменен.");
+            } else {
+                console.log("Домен не нуждается в замене.");
             }
         });
 
