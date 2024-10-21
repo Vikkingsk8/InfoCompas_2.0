@@ -67,7 +67,7 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
     )
     def update_metrics(n):
         try:
-            response = requests.get('http://176.109.109.61:8080/analytics_data')
+            response = requests.get('http://10.0.0.5:8080/analytics_data')
             response.raise_for_status()
             data = response.json()
             logging.info(f"Данные от API: {data}")
@@ -132,7 +132,7 @@ def create_dash_app(flask_app, routes_pathname_prefix='/dashboard/'):
             return None
         
         try:
-            response = requests.get('http://176.109.109.61:8080/analytics_data')
+            response = requests.get('http://10.0.0.5:8080/analytics_data')
             response.raise_for_status()
             data = response.json()
         except requests.RequestException as e:
