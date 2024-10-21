@@ -43,10 +43,13 @@ tokenizer = AutoTokenizer.from_pretrained("cointegrated/rubert-tiny2")
 model = AutoModel.from_pretrained("cointegrated/rubert-tiny2")
 
 def get_embedding(text):
+    if not isinstance(text, str):
+        raise ValueError(f"text input must be of type `str`, got {type(text)}")
     inputs = tokenizer(text, return_tensors='pt', truncation=True, padding=True, max_length=512)
     with torch.no_grad():
         outputs = model(**inputs)
     return outputs.last_hidden_state.mean(dim=1).squeeze().numpy()
+
 
 def load_embeddings_cache():
     if os.path.exists(Config.CACHE_FILE):
@@ -72,13 +75,7 @@ def preprocess_excel_data(df, column_name):
 def preprocess_user_question(question):
     return question.lower().strip().replace('ё', 'е')
 
-def get_embedding(text):
-    if not isinstance(text, str):
-        raise ValueError(f"text input must be of type `str`, got {type(text)}")
-    inputs = tokenizer(text, return_tensors='pt', truncation=True, padding=True, max_length=512)
-    with torch.no_grad():
-        outputs = model(**inputs)
-    return outputs.last_hidden_state.mean(dim=1).squeeze().numpy()
+
 
 df_answers = load_excel_data(Config.EXCEL_PATH)
 df_answers = preprocess_excel_data(df_answers, 'Текст вопроса')

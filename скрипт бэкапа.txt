@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Путь к папке, которую нужно бэкапить
+SOURCE_DIR="/home/user/InfoCompas_2.0"
+
+# Путь к директории, где будет храниться бэкап
+BACKUP_DIR="/backup"
+
+# Имя файла бэкапа
+BACKUP_FILE="InfoCompas_2.0_backup_$(date +%Y%m%d_%H%M%S).tar.gz"
+
+# Лог-файл
+LOG_FILE="$BACKUP_DIR/backup.log"
+
+# Создание бэкапа
+tar -czvf $BACKUP_DIR/$BACKUP_FILE $SOURCE_DIR
+
+# Запись в лог
+echo "Бэкап создан: $(date) - $BACKUP_DIR/$BACKUP_FILE" >> $LOG_FILE
