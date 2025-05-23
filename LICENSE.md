@@ -1,4 +1,4 @@
-CB License
+MIT License
 
 Copyright (c) 2024 Ermilov V.V., Faibisovich V.A.
 
